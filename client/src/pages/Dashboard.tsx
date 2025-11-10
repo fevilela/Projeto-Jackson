@@ -44,10 +44,12 @@ export default function Dashboard() {
 
   const createAthleteMutation = useMutation({
     mutationFn: async (data: { name: string; age: string; sport: string }) => {
-      return await apiRequest('/api/athletes', {
-        method: 'POST',
-        body: JSON.stringify({ name: data.name, age: parseInt(data.age), sport: data.sport }),
+      const response = await apiRequest('POST', '/api/athletes', { 
+        name: data.name, 
+        age: parseInt(data.age), 
+        sport: data.sport 
       });
+      return await response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/athletes'] });
@@ -67,16 +69,14 @@ export default function Dashboard() {
 
   const createTestMutation = useMutation({
     mutationFn: async (data: { athleteId: string; date: string; cmj: string; sj: string; observations: string }) => {
-      return await apiRequest('/api/tests', {
-        method: 'POST',
-        body: JSON.stringify({
-          athleteId: data.athleteId,
-          testDate: data.date,
-          cmj: data.cmj,
-          sj: data.sj,
-          observations: data.observations || null,
-        }),
+      const response = await apiRequest('POST', '/api/tests', {
+        athleteId: data.athleteId,
+        testDate: data.date,
+        cmj: data.cmj,
+        sj: data.sj,
+        observations: data.observations || null,
       });
+      return await response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/tests'] });

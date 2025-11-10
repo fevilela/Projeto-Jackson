@@ -73,8 +73,16 @@ app.use((req, res, next) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
-    res.status(status).json({ message });
-    throw err;
+    log(`Error ${status}: ${message}`);
+    
+    if (err.name === 'ZodError') {
+      return res.status(400).json({ 
+        error: "Dados inválidos", 
+        details: err.errors 
+      });
+    }
+
+    res.status(status).json({ error: message });
   });
 
   // importantly only setup vite in development and after
