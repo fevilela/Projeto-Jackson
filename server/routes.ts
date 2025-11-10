@@ -9,19 +9,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth routes
   app.post("/api/auth/register", async (req, res, next) => {
     try {
+      console.log("[REGISTER] Request body:", JSON.stringify(req.body));
+      
       const { username, password } = insertUserSchema.parse(req.body);
+      console.log("[REGISTER] Parsed username:", username);
       
       const existingUser = await storage.getUserByUsername(username);
       if (existingUser) {
+        console.log("[REGISTER] User already exists");
         return res.status(400).json({ error: "Usuário já existe" });
       }
 
+      console.log("[REGISTER] Hashing password...");
       const hashedPassword = await hashPassword(password);
+      
+      console.log("[REGISTER] Creating user...");
       const user = await storage.createUser({ username, password: hashedPassword });
+      console.log("[REGISTER] User created:", user.id, user.username);
 
       req.session.userId = user.id;
       res.json({ id: user.id, username: user.username });
     } catch (error) {
+      console.error("[REGISTER] Error:", error);
       next(error);
     }
   });
