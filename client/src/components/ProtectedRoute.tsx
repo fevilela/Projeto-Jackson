@@ -1,11 +1,13 @@
-import { ReactNode } from 'react';
-import { Redirect } from 'wouter';
-import { useAuth } from '@/lib/auth';
+import { ReactNode } from "react";
+import { Redirect } from "wouter";
+import { useAuth } from "@/lib/auth";
 
 export function ProtectedRoute({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
+  console.log("[PROTECTED] user:", !!user, "loading:", loading);
 
   if (loading) {
+    console.log("[PROTECTED] Showing loading state");
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -17,8 +19,10 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
   }
 
   if (!user) {
+    console.log("[PROTECTED] No user, redirecting to /login");
     return <Redirect to="/login" />;
   }
 
+  console.log("[PROTECTED] User authenticated, rendering children");
   return <>{children}</>;
 }

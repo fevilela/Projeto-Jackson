@@ -1,5 +1,11 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useLocation } from 'wouter';
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from "react";
+import { useLocation } from "wouter";
 
 interface User {
   id: string;
@@ -17,6 +23,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  console.log("[AUTH] AuthProvider rendering");
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [, setLocation] = useLocation();
@@ -27,56 +34,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const checkAuth = async () => {
     try {
-      const response = await fetch('/api/auth/me');
+      const response = await fetch("/api/auth/me");
       if (response.ok) {
         const userData = await response.json();
         setUser(userData);
       }
     } catch (error) {
-      console.error('Error checking auth:', error);
+      console.error("Error checking auth:", error);
     } finally {
       setLoading(false);
     }
   };
 
   const login = async (username: string, password: string) => {
-    const response = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const response = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password }),
     });
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || 'Erro ao fazer login');
+      throw new Error(error.error || "Erro ao fazer login");
     }
 
     const userData = await response.json();
     setUser(userData);
-    setLocation('/');
+    setLocation("/");
   };
 
   const register = async (username: string, password: string) => {
-    const response = await fetch('/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const response = await fetch("/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password }),
     });
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || 'Erro ao registrar');
+      throw new Error(error.error || "Erro ao registrar");
     }
 
     const userData = await response.json();
     setUser(userData);
-    setLocation('/');
+    setLocation("/");
   };
 
   const logout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' });
+    await fetch("/api/auth/logout", { method: "POST" });
     setUser(null);
-    setLocation('/login');
+    setLocation("/login");
   };
 
   return (
@@ -89,7 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 }

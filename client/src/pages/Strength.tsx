@@ -24,7 +24,7 @@ export default function Strength() {
   const [selectedAthleteId, setSelectedAthleteId] = useState<string>("");
 
   const { data: athletes = [] } = useQuery<Athlete[]>({
-    queryKey: ["/api/athletes"],
+    queryKey: ["/api", "athletes"],
   });
 
   return (

@@ -3,12 +3,19 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { Activity } from "lucide-react";
 
 export default function Login() {
+  console.log("[LOGIN] Rendering Login page");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -50,7 +57,9 @@ export default function Login() {
         <Card>
           <CardHeader>
             <CardTitle>Login</CardTitle>
-            <CardDescription>Digite suas credenciais para acessar</CardDescription>
+            <CardDescription>
+              Digite suas credenciais para acessar
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -94,7 +103,11 @@ export default function Login() {
 
             <div className="mt-4 text-center text-sm">
               <span className="text-muted-foreground">Não tem uma conta? </span>
-              <Link href="/register" className="text-primary hover:underline" data-testid="link-register">
+              <Link
+                href="/register"
+                className="text-primary hover:underline"
+                data-testid="link-register"
+              >
                 Cadastre-se
               </Link>
             </div>

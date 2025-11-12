@@ -180,7 +180,7 @@ export const functionalAssessments = pgTable("functional_assessments", {
   assessmentDate: text("assessment_date").notNull(),
   ankMobility: text("ank_mobility"),
   hipMobility: text("hip_mobility"),
-  kneeStability: text("knee_stability"),
+  thoracicMobility: text("thoracic_mobility"),
   coreStability: text("core_stability"),
   squatPattern: text("squat_pattern"),
   lungePattern: text("lunge_pattern"),
