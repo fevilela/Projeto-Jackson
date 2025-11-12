@@ -2,7 +2,15 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { hashPassword, verifyPassword, requireAuth } from "./auth";
-import { insertUserSchema, insertAthleteSchema, insertTestSchema } from "@shared/schema";
+import {
+  insertUserSchema,
+  insertAthleteSchema,
+  insertTestSchema,
+  insertRunningWorkoutSchema,
+  insertPeriodizationPlanSchema,
+  insertStrengthExerciseSchema,
+  insertFunctionalAssessmentSchema,
+} from "@shared/schema";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -10,10 +18,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/register", async (req, res, next) => {
     try {
       console.log("[REGISTER] Request body:", JSON.stringify(req.body));
-      
+
       const { username, password } = insertUserSchema.parse(req.body);
       console.log("[REGISTER] Parsed username:", username);
-      
+
       const existingUser = await storage.getUserByUsername(username);
       if (existingUser) {
         console.log("[REGISTER] User already exists");
@@ -22,9 +30,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log("[REGISTER] Hashing password...");
       const hashedPassword = await hashPassword(password);
-      
+
       console.log("[REGISTER] Creating user...");
-      const user = await storage.createUser({ username, password: hashedPassword });
+      const user = await storage.createUser({
+        username,
+        password: hashedPassword,
+      });
       console.log("[REGISTER] User created:", user.id, user.username);
 
       req.session.userId = user.id;
@@ -38,7 +49,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/login", async (req, res, next) => {
     try {
       const { username, password } = insertUserSchema.parse(req.body);
-      
+
       const user = await storage.getUserByUsername(username);
       if (!user) {
         return res.status(401).json({ error: "Credenciais inválidas" });
@@ -98,7 +109,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...req.body,
         userId: req.session.userId,
       });
-      
+
       const athlete = await storage.createAthlete(athleteData);
       res.json(athlete);
     } catch (error) {
@@ -125,14 +136,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/tests/athlete/:athleteId", requireAuth, async (req, res, next) => {
-    try {
-      const tests = await storage.getTestsByAthleteId(req.params.athleteId, req.session.userId!);
-      res.json(tests);
-    } catch (error) {
-      next(error);
+  app.get(
+    "/api/tests/athlete/:athleteId",
+    requireAuth,
+    async (req, res, next) => {
+      try {
+        const tests = await storage.getTestsByAthleteId(
+          req.params.athleteId,
+          req.session.userId!
+        );
+        res.json(tests);
+      } catch (error) {
+        next(error);
+      }
     }
-  });
+  );
 
   app.post("/api/tests", requireAuth, async (req, res, next) => {
     try {
@@ -140,7 +158,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...req.body,
         userId: req.session.userId,
       });
-      
+
       const test = await storage.createTest(testData);
       res.json(test);
     } catch (error) {
@@ -156,6 +174,197 @@ export async function registerRoutes(app: Express): Promise<Server> {
       next(error);
     }
   });
+
+  // Running Workout routes
+  app.get(
+    "/api/running-workouts/athlete/:athleteId",
+    requireAuth,
+    async (req, res, next) => {
+      try {
+        const workouts = await storage.getRunningWorkoutsByAthleteId(
+          req.params.athleteId,
+          req.session.userId!
+        );
+        res.json(workouts);
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  app.post("/api/running-workouts", requireAuth, async (req, res, next) => {
+    try {
+      const workoutData = insertRunningWorkoutSchema.parse({
+        ...req.body,
+        userId: req.session.userId,
+      });
+
+      const workout = await storage.createRunningWorkout(workoutData);
+      res.json(workout);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.delete(
+    "/api/running-workouts/:id",
+    requireAuth,
+    async (req, res, next) => {
+      try {
+        await storage.deleteRunningWorkout(req.params.id, req.session.userId!);
+        res.json({ message: "Treino de corrida excluído com sucesso" });
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  // Periodization Plan routes
+  app.get(
+    "/api/periodization-plans/athlete/:athleteId",
+    requireAuth,
+    async (req, res, next) => {
+      try {
+        const plans = await storage.getPeriodizationPlansByAthleteId(
+          req.params.athleteId,
+          req.session.userId!
+        );
+        res.json(plans);
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  app.post("/api/periodization-plans", requireAuth, async (req, res, next) => {
+    try {
+      const planData = insertPeriodizationPlanSchema.parse({
+        ...req.body,
+        userId: req.session.userId,
+      });
+
+      const plan = await storage.createPeriodizationPlan(planData);
+      res.json(plan);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.delete(
+    "/api/periodization-plans/:id",
+    requireAuth,
+    async (req, res, next) => {
+      try {
+        await storage.deletePeriodizationPlan(
+          req.params.id,
+          req.session.userId!
+        );
+        res.json({ message: "Plano de periodização excluído com sucesso" });
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  // Strength Exercise routes
+  app.get(
+    "/api/strength-exercises/athlete/:athleteId",
+    requireAuth,
+    async (req, res, next) => {
+      try {
+        const exercises = await storage.getStrengthExercisesByAthleteId(
+          req.params.athleteId,
+          req.session.userId!
+        );
+        res.json(exercises);
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  app.post("/api/strength-exercises", requireAuth, async (req, res, next) => {
+    try {
+      const exerciseData = insertStrengthExerciseSchema.parse({
+        ...req.body,
+        userId: req.session.userId,
+      });
+
+      const exercise = await storage.createStrengthExercise(exerciseData);
+      res.json(exercise);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.delete(
+    "/api/strength-exercises/:id",
+    requireAuth,
+    async (req, res, next) => {
+      try {
+        await storage.deleteStrengthExercise(
+          req.params.id,
+          req.session.userId!
+        );
+        res.json({ message: "Exercício de força excluído com sucesso" });
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  // Functional Assessment routes
+  app.get(
+    "/api/functional-assessments/athlete/:athleteId",
+    requireAuth,
+    async (req, res, next) => {
+      try {
+        const assessments = await storage.getFunctionalAssessmentsByAthleteId(
+          req.params.athleteId,
+          req.session.userId!
+        );
+        res.json(assessments);
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  app.post(
+    "/api/functional-assessments",
+    requireAuth,
+    async (req, res, next) => {
+      try {
+        const assessmentData = insertFunctionalAssessmentSchema.parse({
+          ...req.body,
+          userId: req.session.userId,
+        });
+
+        const assessment = await storage.createFunctionalAssessment(
+          assessmentData
+        );
+        res.json(assessment);
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  app.delete(
+    "/api/functional-assessments/:id",
+    requireAuth,
+    async (req, res, next) => {
+      try {
+        await storage.deleteFunctionalAssessment(
+          req.params.id,
+          req.session.userId!
+        );
+        res.json({ message: "Avaliação funcional excluída com sucesso" });
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
 
   const httpServer = createServer(app);
 

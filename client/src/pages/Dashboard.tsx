@@ -34,25 +34,27 @@ export default function Dashboard() {
   const { user, logout } = useAuth();
   const { toast } = useToast();
 
-  const { data: athletes = [], isLoading: athletesLoading } = useQuery<Athlete[]>({
-    queryKey: ['/api/athletes'],
+  const { data: athletes = [], isLoading: athletesLoading } = useQuery<
+    Athlete[]
+  >({
+    queryKey: ["/api/athletes"],
   });
 
   const { data: tests = [], isLoading: testsLoading } = useQuery<Test[]>({
-    queryKey: ['/api/tests'],
+    queryKey: ["/api/tests"],
   });
 
   const createAthleteMutation = useMutation({
     mutationFn: async (data: { name: string; age: string; sport: string }) => {
-      const response = await apiRequest('POST', '/api/athletes', { 
-        name: data.name, 
-        age: parseInt(data.age), 
-        sport: data.sport 
+      const response = await apiRequest("POST", "/api/athletes", {
+        name: data.name,
+        age: parseInt(data.age),
+        sport: data.sport,
       });
       return await response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/athletes'] });
+      queryClient.invalidateQueries({ queryKey: ["/api/athletes"] });
       toast({
         title: "Sucesso!",
         description: "Atleta cadastrado com sucesso.",
@@ -68,8 +70,14 @@ export default function Dashboard() {
   });
 
   const createTestMutation = useMutation({
-    mutationFn: async (data: { athleteId: string; date: string; cmj: string; sj: string; observations: string }) => {
-      const response = await apiRequest('POST', '/api/tests', {
+    mutationFn: async (data: {
+      athleteId: string;
+      date: string;
+      cmj: string;
+      sj: string;
+      observations: string;
+    }) => {
+      const response = await apiRequest("POST", "/api/tests", {
         athleteId: data.athleteId,
         testDate: data.date,
         cmj: data.cmj,
@@ -79,7 +87,7 @@ export default function Dashboard() {
       return await response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/tests'] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tests"] });
       toast({
         title: "Sucesso!",
         description: "Teste registrado com sucesso.",
@@ -94,23 +102,38 @@ export default function Dashboard() {
     },
   });
 
-  const handleAddAthlete = (athleteData: { name: string; age: string; sport: string }) => {
+  const handleAddAthlete = (athleteData: {
+    name: string;
+    age: string;
+    sport: string;
+  }) => {
     createAthleteMutation.mutate(athleteData);
   };
 
-  const handleAddTest = (testData: { athleteId: string; date: string; cmj: string; sj: string; observations: string }) => {
+  const handleAddTest = (testData: {
+    athleteId: string;
+    date: string;
+    cmj: string;
+    sj: string;
+    observations: string;
+  }) => {
     createTestMutation.mutate(testData);
   };
 
   const getAthleteTests = (athleteId: string) => {
     return tests
-      .filter(test => test.athleteId === athleteId)
-      .sort((a, b) => new Date(a.testDate).getTime() - new Date(b.testDate).getTime())
-      .map(test => ({
+      .filter((test) => test.athleteId === athleteId)
+      .sort(
+        (a, b) =>
+          new Date(a.testDate).getTime() - new Date(b.testDate).getTime()
+      )
+      .map((test) => ({
         date: test.testDate,
         cmj: parseFloat(test.cmj),
         sj: parseFloat(test.sj),
-        difference: ((parseFloat(test.cmj) - parseFloat(test.sj)) / parseFloat(test.sj)) * 100,
+        difference:
+          ((parseFloat(test.cmj) - parseFloat(test.sj)) / parseFloat(test.sj)) *
+          100,
       }));
   };
 
@@ -129,7 +152,9 @@ export default function Dashboard() {
           <div className="flex items-center gap-3">
             <Activity className="h-8 w-8 text-primary" />
             <div>
-              <h1 className="text-2xl font-bold">Sistema de Avaliação Física</h1>
+              <h1 className="text-2xl font-bold">
+                Sistema de Avaliação Física
+              </h1>
               <p className="text-sm text-muted-foreground">
                 Bem-vindo, {user?.username}
               </p>
@@ -153,18 +178,24 @@ export default function Dashboard() {
       <main className="max-w-7xl mx-auto px-4 py-8">
         <Tabs defaultValue="tests" className="space-y-6">
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="tests" data-testid="tab-tests">Testes</TabsTrigger>
-            <TabsTrigger value="athletes" data-testid="tab-athletes">Atletas</TabsTrigger>
-            <TabsTrigger value="analytics" data-testid="tab-analytics">Análises</TabsTrigger>
+            <TabsTrigger value="tests" data-testid="tab-tests">
+              CMJ e SJ
+            </TabsTrigger>
+            <TabsTrigger value="athletes" data-testid="tab-athletes">
+              Atletas
+            </TabsTrigger>
+            <TabsTrigger value="analytics" data-testid="tab-analytics">
+              Análises
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="tests" className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <TestForm 
-                athletes={athletes.map(a => ({ id: a.id, name: a.name }))} 
-                onSubmit={handleAddTest} 
+              <TestForm
+                athletes={athletes.map((a) => ({ id: a.id, name: a.name }))}
+                onSubmit={handleAddTest}
               />
-              
+
               <div className="space-y-4">
                 <h2 className="text-xl font-semibold">Testes Recentes</h2>
                 {testsLoading ? (
@@ -201,7 +232,12 @@ export default function Dashboard() {
                   <p>Carregando atletas...</p>
                 </div>
               ) : (
-                <AthleteList athletes={athletes.map(a => ({ ...a, age: a.age.toString() }))} />
+                <AthleteList
+                  athletes={athletes.map((a) => ({
+                    ...a,
+                    age: a.age.toString(),
+                  }))}
+                />
               )}
             </div>
           </TabsContent>
@@ -213,7 +249,9 @@ export default function Dashboard() {
               </div>
             ) : athletes.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground border rounded-lg">
-                <p>Cadastre atletas e registre testes para visualizar análises</p>
+                <p>
+                  Cadastre atletas e registre testes para visualizar análises
+                </p>
               </div>
             ) : (
               <div className="space-y-6">
