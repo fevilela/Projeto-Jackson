@@ -104,6 +104,34 @@ export const insertRunningWorkoutSchema = createInsertSchema(
 export type InsertRunningWorkout = z.infer<typeof insertRunningWorkoutSchema>;
 export type RunningWorkout = typeof runningWorkouts.$inferSelect;
 
+// Running Plans
+export const runningPlans = pgTable("running_plans", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  athleteId: varchar("athlete_id")
+    .notNull()
+    .references(() => athletes.id, { onDelete: "cascade" }),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  startDate: text("start_date"),
+  vo1: text("vo1"),
+  vo2: text("vo2"),
+  vo2lt: text("vo2lt"),
+  vo2Dmax: text("vo2dmax"),
+  tfExplanation: text("tf_explanation"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertRunningPlanSchema = createInsertSchema(runningPlans).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertRunningPlan = z.infer<typeof insertRunningPlanSchema>;
+export type RunningPlan = typeof runningPlans.$inferSelect;
+
 // Periodization Plans
 export const periodizationPlans = pgTable("periodization_plans", {
   id: varchar("id")
@@ -134,6 +162,35 @@ export type InsertPeriodizationPlan = z.infer<
   typeof insertPeriodizationPlanSchema
 >;
 export type PeriodizationPlan = typeof periodizationPlans.$inferSelect;
+
+// Periodization Notes (General Observations)
+export const periodizationNotes = pgTable("periodization_notes", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  athleteId: varchar("athlete_id")
+    .notNull()
+    .references(() => athletes.id, { onDelete: "cascade" }),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  generalObservations: text("general_observations"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertPeriodizationNoteSchema = createInsertSchema(
+  periodizationNotes
+).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertPeriodizationNote = z.infer<
+  typeof insertPeriodizationNoteSchema
+>;
+export type PeriodizationNote = typeof periodizationNotes.$inferSelect;
 
 // Strength Training
 export const strengthExercises = pgTable("strength_exercises", {

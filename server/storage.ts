@@ -5,7 +5,9 @@ import {
   athletes,
   tests,
   runningWorkouts,
+  runningPlans,
   periodizationPlans,
+  periodizationNotes,
   strengthExercises,
   functionalAssessments,
   type User,
@@ -16,8 +18,12 @@ import {
   type InsertTest,
   type RunningWorkout,
   type InsertRunningWorkout,
+  type RunningPlan,
+  type InsertRunningPlan,
   type PeriodizationPlan,
   type InsertPeriodizationPlan,
+  type PeriodizationNote,
+  type InsertPeriodizationNote,
   type StrengthExercise,
   type InsertStrengthExercise,
   type FunctionalAssessment,
@@ -50,6 +56,19 @@ export interface IStorage {
   createRunningWorkout(workout: InsertRunningWorkout): Promise<RunningWorkout>;
   deleteRunningWorkout(id: string, userId: string): Promise<void>;
 
+  // Running Plan methods
+  getRunningPlansByAthleteId(
+    athleteId: string,
+    userId: string
+  ): Promise<RunningPlan[]>;
+  createRunningPlan(plan: InsertRunningPlan): Promise<RunningPlan>;
+  updateRunningPlan(
+    id: string,
+    userId: string,
+    plan: Partial<InsertRunningPlan>
+  ): Promise<RunningPlan>;
+  deleteRunningPlan(id: string, userId: string): Promise<void>;
+
   // Periodization Plan methods
   getPeriodizationPlansByAthleteId(
     athleteId: string,
@@ -59,6 +78,20 @@ export interface IStorage {
     plan: InsertPeriodizationPlan
   ): Promise<PeriodizationPlan>;
   deletePeriodizationPlan(id: string, userId: string): Promise<void>;
+
+  // Periodization Note methods
+  getPeriodizationNoteByAthleteId(
+    athleteId: string,
+    userId: string
+  ): Promise<PeriodizationNote | undefined>;
+  createPeriodizationNote(
+    note: InsertPeriodizationNote
+  ): Promise<PeriodizationNote>;
+  updatePeriodizationNote(
+    id: string,
+    userId: string,
+    note: Partial<InsertPeriodizationNote>
+  ): Promise<PeriodizationNote>;
 
   // Strength Exercise methods
   getStrengthExercisesByAthleteId(
@@ -213,6 +246,47 @@ export class DatabaseStorage implements IStorage {
       );
   }
 
+  // Running Plan methods
+  async getRunningPlansByAthleteId(
+    athleteId: string,
+    userId: string
+  ): Promise<RunningPlan[]> {
+    return await db
+      .select()
+      .from(runningPlans)
+      .where(
+        and(
+          eq(runningPlans.athleteId, athleteId),
+          eq(runningPlans.userId, userId)
+        )
+      )
+      .orderBy(desc(runningPlans.createdAt));
+  }
+
+  async createRunningPlan(plan: InsertRunningPlan): Promise<RunningPlan> {
+    const result = await db.insert(runningPlans).values(plan).returning();
+    return result[0];
+  }
+
+  async updateRunningPlan(
+    id: string,
+    userId: string,
+    plan: Partial<InsertRunningPlan>
+  ): Promise<RunningPlan> {
+    const result = await db
+      .update(runningPlans)
+      .set(plan)
+      .where(and(eq(runningPlans.id, id), eq(runningPlans.userId, userId)))
+      .returning();
+    return result[0];
+  }
+
+  async deleteRunningPlan(id: string, userId: string): Promise<void> {
+    await db
+      .delete(runningPlans)
+      .where(and(eq(runningPlans.id, id), eq(runningPlans.userId, userId)));
+  }
+
   // Periodization Plan methods
   async getPeriodizationPlansByAthleteId(
     athleteId: string,
@@ -246,6 +320,49 @@ export class DatabaseStorage implements IStorage {
           eq(periodizationPlans.userId, userId)
         )
       );
+  }
+
+  // Periodization Note methods
+  async getPeriodizationNoteByAthleteId(
+    athleteId: string,
+    userId: string
+  ): Promise<PeriodizationNote | undefined> {
+    const result = await db
+      .select()
+      .from(periodizationNotes)
+      .where(
+        and(
+          eq(periodizationNotes.athleteId, athleteId),
+          eq(periodizationNotes.userId, userId)
+        )
+      )
+      .limit(1);
+    return result[0];
+  }
+
+  async createPeriodizationNote(
+    note: InsertPeriodizationNote
+  ): Promise<PeriodizationNote> {
+    const result = await db.insert(periodizationNotes).values(note).returning();
+    return result[0];
+  }
+
+  async updatePeriodizationNote(
+    id: string,
+    userId: string,
+    note: Partial<InsertPeriodizationNote>
+  ): Promise<PeriodizationNote> {
+    const result = await db
+      .update(periodizationNotes)
+      .set({ ...note, updatedAt: new Date() })
+      .where(
+        and(
+          eq(periodizationNotes.id, id),
+          eq(periodizationNotes.userId, userId)
+        )
+      )
+      .returning();
+    return result[0];
   }
 
   // Strength Exercise methods

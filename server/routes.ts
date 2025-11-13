@@ -7,7 +7,9 @@ import {
   insertAthleteSchema,
   insertTestSchema,
   insertRunningWorkoutSchema,
+  insertRunningPlanSchema,
   insertPeriodizationPlanSchema,
+  insertPeriodizationNoteSchema,
   insertStrengthExerciseSchema,
   insertFunctionalAssessmentSchema,
 } from "@shared/schema";
@@ -219,6 +221,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   );
 
+  // Running Plan routes
+  app.get(
+    "/api/running-plans/athlete/:athleteId",
+    requireAuth,
+    async (req, res, next) => {
+      try {
+        const plans = await storage.getRunningPlansByAthleteId(
+          req.params.athleteId,
+          req.session.userId!
+        );
+        res.json(plans);
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  app.post("/api/running-plans", requireAuth, async (req, res, next) => {
+    try {
+      const planData = insertRunningPlanSchema.parse({
+        ...req.body,
+        userId: req.session.userId,
+      });
+
+      const plan = await storage.createRunningPlan(planData);
+      res.json(plan);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.patch("/api/running-plans/:id", requireAuth, async (req, res, next) => {
+    try {
+      const planData = insertRunningPlanSchema.partial().parse(req.body);
+
+      const plan = await storage.updateRunningPlan(
+        req.params.id,
+        req.session.userId!,
+        planData
+      );
+      res.json(plan);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.delete("/api/running-plans/:id", requireAuth, async (req, res, next) => {
+    try {
+      await storage.deleteRunningPlan(req.params.id, req.session.userId!);
+      res.json({ message: "Plano de corrida excluído com sucesso" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // Periodization Plan routes
   app.get(
     "/api/periodization-plans/athlete/:athleteId",
@@ -260,6 +317,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
           req.session.userId!
         );
         res.json({ message: "Plano de periodização excluído com sucesso" });
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  // Periodization Note routes
+  app.get(
+    "/api/periodization-notes/athlete/:athleteId",
+    requireAuth,
+    async (req, res, next) => {
+      try {
+        const note = await storage.getPeriodizationNoteByAthleteId(
+          req.params.athleteId,
+          req.session.userId!
+        );
+        res.json(note || null);
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  app.post("/api/periodization-notes", requireAuth, async (req, res, next) => {
+    try {
+      const noteData = insertPeriodizationNoteSchema.parse({
+        ...req.body,
+        userId: req.session.userId,
+      });
+
+      const note = await storage.createPeriodizationNote(noteData);
+      res.json(note);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.patch(
+    "/api/periodization-notes/:id",
+    requireAuth,
+    async (req, res, next) => {
+      try {
+        const noteData = insertPeriodizationNoteSchema
+          .partial()
+          .parse(req.body);
+
+        const note = await storage.updatePeriodizationNote(
+          req.params.id,
+          req.session.userId!,
+          noteData
+        );
+        res.json(note);
       } catch (error) {
         next(error);
       }
