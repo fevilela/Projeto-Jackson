@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
 import Athletes from "@/pages/Athletes";
 import Tests from "@/pages/Tests";
+import Exercises from "@/pages/Exercises";
 import Running from "@/pages/Running";
 import Periodization from "@/pages/Periodization";
 import Strength from "@/pages/Strength";
@@ -50,7 +51,9 @@ function MainLayout() {
           <main className="flex-1 overflow-auto">
             <Switch>
               <Route path="/" component={Athletes} />
+              <Route path="/athletes" component={Athletes} />
               <Route path="/tests" component={Tests} />
+              <Route path="/exercises" component={Exercises} />
               <Route path="/running" component={Running} />
               <Route path="/periodization" component={Periodization} />
               <Route path="/strength" component={Strength} />

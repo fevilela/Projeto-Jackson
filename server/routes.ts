@@ -12,6 +12,7 @@ import {
   insertPeriodizationNoteSchema,
   insertStrengthExerciseSchema,
   insertFunctionalAssessmentSchema,
+  insertExerciseSchema,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -474,6 +475,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
   );
+
+  // Exercise routes
+  app.get("/api/exercises", requireAuth, async (req, res, next) => {
+    try {
+      const exercises = await storage.getExercisesByUserId(req.session.userId!);
+      res.json(exercises);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/exercises", requireAuth, async (req, res, next) => {
+    try {
+      const exerciseData = insertExerciseSchema.parse({
+        ...req.body,
+        userId: req.session.userId,
+      });
+
+      const exercise = await storage.createExercise(exerciseData);
+      res.json(exercise);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.delete("/api/exercises/:id", requireAuth, async (req, res, next) => {
+    try {
+      await storage.deleteExercise(req.params.id, req.session.userId!);
+      res.json({ message: "Exercício excluído com sucesso" });
+    } catch (error) {
+      next(error);
+    }
+  });
 
   const httpServer = createServer(app);
 

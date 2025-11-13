@@ -259,3 +259,25 @@ export type InsertFunctionalAssessment = z.infer<
   typeof insertFunctionalAssessmentSchema
 >;
 export type FunctionalAssessment = typeof functionalAssessments.$inferSelect;
+
+// Exercises
+export const exercises = pgTable("exercises", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  category: text("category").notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertExerciseSchema = createInsertSchema(exercises).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertExercise = z.infer<typeof insertExerciseSchema>;
+export type Exercise = typeof exercises.$inferSelect;

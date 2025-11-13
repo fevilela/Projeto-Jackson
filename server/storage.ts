@@ -10,6 +10,7 @@ import {
   periodizationNotes,
   strengthExercises,
   functionalAssessments,
+  exercises,
   type User,
   type InsertUser,
   type Athlete,
@@ -28,6 +29,8 @@ import {
   type InsertStrengthExercise,
   type FunctionalAssessment,
   type InsertFunctionalAssessment,
+  type Exercise,
+  type InsertExercise,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -112,6 +115,11 @@ export interface IStorage {
     assessment: InsertFunctionalAssessment
   ): Promise<FunctionalAssessment>;
   deleteFunctionalAssessment(id: string, userId: string): Promise<void>;
+
+  // Exercise methods
+  getExercisesByUserId(userId: string): Promise<Exercise[]>;
+  createExercise(exercise: InsertExercise): Promise<Exercise>;
+  deleteExercise(id: string, userId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -436,6 +444,26 @@ export class DatabaseStorage implements IStorage {
           eq(functionalAssessments.userId, userId)
         )
       );
+  }
+
+  // Exercise methods
+  async getExercisesByUserId(userId: string): Promise<Exercise[]> {
+    return await db
+      .select()
+      .from(exercises)
+      .where(eq(exercises.userId, userId))
+      .orderBy(desc(exercises.createdAt));
+  }
+
+  async createExercise(exercise: InsertExercise): Promise<Exercise> {
+    const result = await db.insert(exercises).values(exercise).returning();
+    return result[0];
+  }
+
+  async deleteExercise(id: string, userId: string): Promise<void> {
+    await db
+      .delete(exercises)
+      .where(and(eq(exercises.id, id), eq(exercises.userId, userId)));
   }
 }
 
