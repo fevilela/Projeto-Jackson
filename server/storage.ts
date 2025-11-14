@@ -11,6 +11,9 @@ import {
   strengthExercises,
   functionalAssessments,
   exercises,
+  movementTypes,
+  movementFields,
+  functionalAssessmentValues,
   type User,
   type InsertUser,
   type Athlete,
@@ -31,6 +34,12 @@ import {
   type InsertFunctionalAssessment,
   type Exercise,
   type InsertExercise,
+  type MovementType,
+  type InsertMovementType,
+  type MovementField,
+  type InsertMovementField,
+  type FunctionalAssessmentValue,
+  type InsertFunctionalAssessmentValue,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -110,9 +119,13 @@ export interface IStorage {
   getFunctionalAssessmentsByAthleteId(
     athleteId: string,
     userId: string
-  ): Promise<FunctionalAssessment[]>;
+  ): Promise<(FunctionalAssessment & { dynamicValues?: any[] })[]>;
+  getFunctionalAssessmentWithValues(
+    assessmentId: string
+  ): Promise<FunctionalAssessmentValue[]>;
   createFunctionalAssessment(
-    assessment: InsertFunctionalAssessment
+    assessment: InsertFunctionalAssessment,
+    values?: { fieldId: string; value: string }[]
   ): Promise<FunctionalAssessment>;
   deleteFunctionalAssessment(id: string, userId: string): Promise<void>;
 
@@ -120,6 +133,27 @@ export interface IStorage {
   getExercisesByUserId(userId: string): Promise<Exercise[]>;
   createExercise(exercise: InsertExercise): Promise<Exercise>;
   deleteExercise(id: string, userId: string): Promise<void>;
+
+  // Movement Type methods
+  getMovementTypesByUserId(userId: string): Promise<MovementType[]>;
+  getMovementType(
+    id: string,
+    userId: string
+  ): Promise<MovementType | undefined>;
+  createMovementType(movementType: InsertMovementType): Promise<MovementType>;
+  deleteMovementType(id: string, userId: string): Promise<void>;
+
+  // Movement Field methods
+  getMovementFieldsByTypeId(
+    movementTypeId: string,
+    userId: string
+  ): Promise<MovementField[]>;
+  createMovementField(field: InsertMovementField): Promise<MovementField>;
+  deleteMovementField(
+    id: string,
+    movementTypeId: string,
+    userId: string
+  ): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -412,8 +446,8 @@ export class DatabaseStorage implements IStorage {
   async getFunctionalAssessmentsByAthleteId(
     athleteId: string,
     userId: string
-  ): Promise<FunctionalAssessment[]> {
-    return await db
+  ): Promise<(FunctionalAssessment & { dynamicValues?: any[] })[]> {
+    const assessments = await db
       .select()
       .from(functionalAssessments)
       .where(
@@ -423,16 +457,104 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .orderBy(desc(functionalAssessments.assessmentDate));
+
+    const enrichedAssessments = await Promise.all(
+      assessments.map(async (assessment) => {
+        if (!assessment.movementTypeId) {
+          return { ...assessment, dynamicValues: [] };
+        }
+
+        const values = await db
+          .select({
+            id: functionalAssessmentValues.id,
+            fieldId: functionalAssessmentValues.fieldId,
+            value: functionalAssessmentValues.value,
+            fieldLabel: movementFields.fieldLabel,
+            fieldName: movementFields.fieldName,
+          })
+          .from(functionalAssessmentValues)
+          .leftJoin(
+            movementFields,
+            eq(functionalAssessmentValues.fieldId, movementFields.id)
+          )
+          .where(eq(functionalAssessmentValues.assessmentId, assessment.id));
+
+        return {
+          ...assessment,
+          dynamicValues: values.filter((v) => v.fieldLabel !== null),
+        };
+      })
+    );
+
+    return enrichedAssessments;
+  }
+
+  async getFunctionalAssessmentWithValues(
+    assessmentId: string
+  ): Promise<FunctionalAssessmentValue[]> {
+    return await db
+      .select()
+      .from(functionalAssessmentValues)
+      .where(eq(functionalAssessmentValues.assessmentId, assessmentId));
   }
 
   async createFunctionalAssessment(
-    assessment: InsertFunctionalAssessment
+    assessment: InsertFunctionalAssessment,
+    values?: { fieldId: string; value: string }[]
   ): Promise<FunctionalAssessment> {
-    const result = await db
-      .insert(functionalAssessments)
-      .values(assessment)
-      .returning();
-    return result[0];
+    if (values && values.length > 0 && !assessment.movementTypeId) {
+      throw new Error(
+        "movementTypeId é obrigatório quando valores dinâmicos são fornecidos"
+      );
+    }
+
+    if (values && values.length > 0 && assessment.movementTypeId) {
+      const movementType = await this.getMovementType(
+        assessment.movementTypeId,
+        assessment.userId
+      );
+
+      if (!movementType) {
+        throw new Error("Tipo de movimento não encontrado");
+      }
+
+      const validFields = await this.getMovementFieldsByTypeId(
+        assessment.movementTypeId,
+        assessment.userId
+      );
+      const validFieldIds = new Set(validFields.map((f) => f.id));
+
+      for (const value of values) {
+        if (!validFieldIds.has(value.fieldId)) {
+          throw new Error("Campo inválido para este tipo de movimento");
+        }
+      }
+    }
+
+    return await db.transaction(async (tx) => {
+      const result = await tx
+        .insert(functionalAssessments)
+        .values(assessment)
+        .returning();
+
+      const createdAssessment = result[0];
+
+      if (values && values.length > 0) {
+        const valuesToInsert = values
+          .filter((v) => v.value && v.value.trim() !== "")
+          .map((v) => ({
+            assessmentId: createdAssessment.id,
+            fieldId: v.fieldId,
+            value: v.value,
+          }));
+
+        if (valuesToInsert.length > 0) {
+          await tx.insert(functionalAssessmentValues).values(valuesToInsert);
+        }
+      }
+
+      return createdAssessment;
+    });
   }
 
   async deleteFunctionalAssessment(id: string, userId: string): Promise<void> {
@@ -464,6 +586,85 @@ export class DatabaseStorage implements IStorage {
     await db
       .delete(exercises)
       .where(and(eq(exercises.id, id), eq(exercises.userId, userId)));
+  }
+
+  // Movement Type methods
+  async getMovementTypesByUserId(userId: string): Promise<MovementType[]> {
+    return await db
+      .select()
+      .from(movementTypes)
+      .where(eq(movementTypes.userId, userId))
+      .orderBy(desc(movementTypes.createdAt));
+  }
+
+  async getMovementType(
+    id: string,
+    userId: string
+  ): Promise<MovementType | undefined> {
+    const result = await db
+      .select()
+      .from(movementTypes)
+      .where(and(eq(movementTypes.id, id), eq(movementTypes.userId, userId)))
+      .limit(1);
+    return result[0];
+  }
+
+  async createMovementType(
+    movementType: InsertMovementType
+  ): Promise<MovementType> {
+    const result = await db
+      .insert(movementTypes)
+      .values(movementType)
+      .returning();
+    return result[0];
+  }
+
+  async deleteMovementType(id: string, userId: string): Promise<void> {
+    await db
+      .delete(movementTypes)
+      .where(and(eq(movementTypes.id, id), eq(movementTypes.userId, userId)));
+  }
+
+  // Movement Field methods
+  async getMovementFieldsByTypeId(
+    movementTypeId: string,
+    userId: string
+  ): Promise<MovementField[]> {
+    const movementType = await this.getMovementType(movementTypeId, userId);
+    if (!movementType) {
+      return [];
+    }
+    return await db
+      .select()
+      .from(movementFields)
+      .where(eq(movementFields.movementTypeId, movementTypeId))
+      .orderBy(movementFields.fieldOrder);
+  }
+
+  async createMovementField(
+    field: InsertMovementField
+  ): Promise<MovementField> {
+    const result = await db.insert(movementFields).values(field).returning();
+    return result[0];
+  }
+
+  async deleteMovementField(
+    id: string,
+    movementTypeId: string,
+    userId: string
+  ): Promise<void> {
+    const movementType = await this.getMovementType(movementTypeId, userId);
+    if (!movementType) {
+      throw new Error("Tipo de movimento não encontrado ou não autorizado");
+    }
+    await db
+      .delete(movementFields)
+      .where(
+        and(
+          eq(movementFields.id, id),
+          eq(movementFields.movementTypeId, movementTypeId)
+        )
+      );
   }
 }
 

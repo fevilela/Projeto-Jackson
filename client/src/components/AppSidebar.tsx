@@ -30,6 +30,7 @@ import {
   UserPlus,
   ClipboardCheck,
   Weight,
+  Layers,
 } from "lucide-react";
 
 const cadastroItems = [
@@ -39,9 +40,9 @@ const cadastroItems = [
     icon: UserPlus,
   },
   {
-    title: "Teste/Movimento",
-    url: "/tests",
-    icon: ClipboardCheck,
+    title: "Tipos de Movimento",
+    url: "/movement-types",
+    icon: Layers,
   },
   {
     title: "Exercício",
@@ -51,6 +52,11 @@ const cadastroItems = [
 ];
 
 const otherMenuItems = [
+  {
+    title: "Teste/Movimento",
+    url: "/tests",
+    icon: ClipboardCheck,
+  },
   {
     title: "Corrida",
     url: "/running",

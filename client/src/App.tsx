@@ -13,6 +13,7 @@ import { LogOut } from "lucide-react";
 import Athletes from "@/pages/Athletes";
 import Tests from "@/pages/Tests";
 import Exercises from "@/pages/Exercises";
+import MovementTypes from "@/pages/MovementTypes";
 import Running from "@/pages/Running";
 import Periodization from "@/pages/Periodization";
 import Strength from "@/pages/Strength";
@@ -54,6 +55,7 @@ function MainLayout() {
               <Route path="/athletes" component={Athletes} />
               <Route path="/tests" component={Tests} />
               <Route path="/exercises" component={Exercises} />
+              <Route path="/movement-types" component={MovementTypes} />
               <Route path="/running" component={Running} />
               <Route path="/periodization" component={Periodization} />
               <Route path="/strength" component={Strength} />

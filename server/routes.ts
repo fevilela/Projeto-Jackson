@@ -13,6 +13,8 @@ import {
   insertStrengthExerciseSchema,
   insertFunctionalAssessmentSchema,
   insertExerciseSchema,
+  insertMovementTypeSchema,
+  insertMovementFieldSchema,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -445,13 +447,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     requireAuth,
     async (req, res, next) => {
       try {
+        const { values, ...restBody } = req.body;
+
         const assessmentData = insertFunctionalAssessmentSchema.parse({
-          ...req.body,
+          ...restBody,
           userId: req.session.userId,
         });
 
+        const valuesArray = Array.isArray(values)
+          ? values.map((v: any) => ({
+              fieldId: String(v.fieldId),
+              value: String(v.value || ""),
+            }))
+          : undefined;
+
         const assessment = await storage.createFunctionalAssessment(
-          assessmentData
+          assessmentData,
+          valuesArray
         );
         res.json(assessment);
       } catch (error) {
@@ -508,6 +520,120 @@ export async function registerRoutes(app: Express): Promise<Server> {
       next(error);
     }
   });
+
+  // Movement Type routes
+  app.get("/api/movement-types", requireAuth, async (req, res, next) => {
+    try {
+      const movementTypes = await storage.getMovementTypesByUserId(
+        req.session.userId!
+      );
+      res.json(movementTypes);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/movement-types/:id", requireAuth, async (req, res, next) => {
+    try {
+      const movementType = await storage.getMovementType(
+        req.params.id,
+        req.session.userId!
+      );
+      if (!movementType) {
+        return res
+          .status(404)
+          .json({ error: "Tipo de movimento não encontrado" });
+      }
+      res.json(movementType);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/movement-types", requireAuth, async (req, res, next) => {
+    try {
+      const movementTypeData = insertMovementTypeSchema.parse({
+        ...req.body,
+        userId: req.session.userId,
+      });
+
+      const movementType = await storage.createMovementType(movementTypeData);
+      res.json(movementType);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.delete("/api/movement-types/:id", requireAuth, async (req, res, next) => {
+    try {
+      await storage.deleteMovementType(req.params.id, req.session.userId!);
+      res.json({ message: "Tipo de movimento excluído com sucesso" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Movement Field routes
+  app.get(
+    "/api/movement-types/:typeId/fields",
+    requireAuth,
+    async (req, res, next) => {
+      try {
+        const fields = await storage.getMovementFieldsByTypeId(
+          req.params.typeId,
+          req.session.userId!
+        );
+        res.json(fields);
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  app.post(
+    "/api/movement-types/:typeId/fields",
+    requireAuth,
+    async (req, res, next) => {
+      try {
+        const movementType = await storage.getMovementType(
+          req.params.typeId,
+          req.session.userId!
+        );
+        if (!movementType) {
+          return res
+            .status(404)
+            .json({ error: "Tipo de movimento não encontrado" });
+        }
+
+        const fieldData = insertMovementFieldSchema.parse({
+          ...req.body,
+          movementTypeId: req.params.typeId,
+        });
+
+        const field = await storage.createMovementField(fieldData);
+        res.json(field);
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  app.delete(
+    "/api/movement-types/:typeId/fields/:id",
+    requireAuth,
+    async (req, res, next) => {
+      try {
+        await storage.deleteMovementField(
+          req.params.id,
+          req.params.typeId,
+          req.session.userId!
+        );
+        res.json({ message: "Campo excluído com sucesso" });
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
 
   const httpServer = createServer(app);
 

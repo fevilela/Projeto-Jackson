@@ -223,6 +223,51 @@ export type InsertStrengthExercise = z.infer<
 >;
 export type StrengthExercise = typeof strengthExercises.$inferSelect;
 
+// Movement Types (tipos de movimento customizáveis)
+export const movementTypes = pgTable("movement_types", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertMovementTypeSchema = createInsertSchema(movementTypes).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertMovementType = z.infer<typeof insertMovementTypeSchema>;
+export type MovementType = typeof movementTypes.$inferSelect;
+
+// Movement Fields (campos disponíveis para cada tipo de movimento)
+export const movementFields = pgTable("movement_fields", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  movementTypeId: varchar("movement_type_id")
+    .notNull()
+    .references(() => movementTypes.id, { onDelete: "cascade" }),
+  fieldName: text("field_name").notNull(),
+  fieldLabel: text("field_label").notNull(),
+  fieldOrder: integer("field_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertMovementFieldSchema = createInsertSchema(
+  movementFields
+).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertMovementField = z.infer<typeof insertMovementFieldSchema>;
+export type MovementField = typeof movementFields.$inferSelect;
+
 // Functional Assessments
 export const functionalAssessments = pgTable("functional_assessments", {
   id: varchar("id")
@@ -234,6 +279,10 @@ export const functionalAssessments = pgTable("functional_assessments", {
   userId: varchar("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
+  movementTypeId: varchar("movement_type_id").references(
+    () => movementTypes.id,
+    { onDelete: "set null" }
+  ),
   assessmentDate: text("assessment_date").notNull(),
   ankMobility: text("ank_mobility"),
   hipMobility: text("hip_mobility"),
@@ -281,3 +330,34 @@ export const insertExerciseSchema = createInsertSchema(exercises).omit({
 
 export type InsertExercise = z.infer<typeof insertExerciseSchema>;
 export type Exercise = typeof exercises.$inferSelect;
+
+// Functional Assessment Values (valores dinâmicos das avaliações)
+export const functionalAssessmentValues = pgTable(
+  "functional_assessment_values",
+  {
+    id: varchar("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    assessmentId: varchar("assessment_id")
+      .notNull()
+      .references(() => functionalAssessments.id, { onDelete: "cascade" }),
+    fieldId: varchar("field_id")
+      .notNull()
+      .references(() => movementFields.id, { onDelete: "cascade" }),
+    value: text("value"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  }
+);
+
+export const insertFunctionalAssessmentValueSchema = createInsertSchema(
+  functionalAssessmentValues
+).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertFunctionalAssessmentValue = z.infer<
+  typeof insertFunctionalAssessmentValueSchema
+>;
+export type FunctionalAssessmentValue =
+  typeof functionalAssessmentValues.$inferSelect;
