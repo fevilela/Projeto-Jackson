@@ -12,6 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -94,11 +95,13 @@ export default function Running() {
   const [selectedAthleteId, setSelectedAthleteId] = useState<string>("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [startDate, setStartDate] = useState("");
-  const [vo1, setVo1] = useState("");
-  const [vo2, setVo2] = useState("");
-  const [vo2lt, setVo2lt] = useState("");
-  const [vo2max, setVo2max] = useState("");
   const [tfExplanation, setTfExplanation] = useState("");
+
+  const [testDistance, setTestDistance] = useState("3200");
+  const [testMinutes, setTestMinutes] = useState("");
+  const [testSeconds, setTestSeconds] = useState("");
+  const [calculatedResults, setCalculatedResults] = useState<any>(null);
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -118,18 +121,28 @@ export default function Running() {
   useEffect(() => {
     if (currentPlan) {
       setStartDate(currentPlan.startDate || "");
-      setVo1(currentPlan.vo1 || "");
-      setVo2(currentPlan.vo2 || "");
-      setVo2lt(currentPlan.vo2lt || "");
-      setVo2max(currentPlan.vo2Dmax || "");
       setTfExplanation(currentPlan.tfExplanation || "");
+
+      if (
+        currentPlan.vo1 ||
+        currentPlan.vo2 ||
+        currentPlan.vo2lt ||
+        currentPlan.vo2Dmax
+      ) {
+        const loadedResults = {
+          iatKmH: currentPlan.vo1 || "",
+          velocidadePicoKmH: currentPlan.vo2 || "",
+          velocidadeLTKmH: currentPlan.vo2lt || "",
+          vo2max: currentPlan.vo2Dmax || "",
+        };
+        setCalculatedResults(loadedResults);
+      } else {
+        setCalculatedResults(null);
+      }
     } else {
       setStartDate("");
-      setVo1("");
-      setVo2("");
-      setVo2lt("");
-      setVo2max("");
       setTfExplanation("");
+      setCalculatedResults(null);
     }
   }, [currentPlan]);
 
@@ -153,13 +166,17 @@ export default function Running() {
 
   const savePlanMutation = useMutation({
     mutationFn: async () => {
+      if (!calculatedResults) {
+        throw new Error("Calcule os valores primeiro");
+      }
+
       const planData = {
         athleteId: selectedAthleteId,
         startDate: startDate || null,
-        vo1: vo1 || null,
-        vo2: vo2 || null,
-        vo2lt: vo2lt || null,
-        vo2Dmax: vo2max || null,
+        vo1: calculatedResults.iatKmH || null,
+        vo2: calculatedResults.velocidadePicoKmH || null,
+        vo2lt: calculatedResults.velocidadeLTKmH || null,
+        vo2Dmax: calculatedResults.vo2max || null,
         tfExplanation: tfExplanation || null,
       };
 
@@ -184,14 +201,14 @@ export default function Running() {
         queryKey: ["/api/running-plans/athlete", selectedAthleteId],
       });
       toast({
-        title: "Plano salvo",
-        description: "As informações do plano foram salvas com sucesso.",
+        title: "Plano salvo com sucesso!",
+        description: "Data, valores calculados e explicação foram salvos.",
       });
     },
-    onError: () => {
+    onError: (error: Error) => {
       toast({
         title: "Erro",
-        description: "Não foi possível salvar o plano.",
+        description: error.message || "Não foi possível salvar o plano.",
         variant: "destructive",
       });
     },
@@ -259,10 +276,6 @@ export default function Running() {
     }
   };
 
-  const handleSavePlan = () => {
-    savePlanMutation.mutate();
-  };
-
   const groupedWorkouts = workouts.reduce((acc, workout) => {
     const week = workout.weekNumber;
     if (!acc[week]) {
@@ -271,6 +284,154 @@ export default function Running() {
     acc[week].push(workout);
     return acc;
   }, {} as Record<number, RunningWorkout[]>);
+
+  const calculateVO2MaxTrainedMen = () => {
+    if (!testMinutes || !testSeconds) {
+      toast({
+        title: "Erro",
+        description: "Preencha minutos e segundos",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const distance = parseFloat(testDistance);
+    const minutes = parseFloat(testMinutes);
+    const seconds = parseFloat(testSeconds);
+    const totalMinutes = minutes + seconds / 60;
+
+    const velocidadeMedia = distance / totalMinutes;
+    const velocidadeKmH = velocidadeMedia * 0.06;
+    const iat = velocidadeMedia * 0.892;
+    const iatKmH = iat * 0.06;
+
+    const vo2max = 0.0193 * velocidadeMedia + 4.374;
+    const vo2_4mM = vo2max * 0.886;
+    const vo2_25mM = vo2_4mM * 1.009;
+    const vo2_2mM = vo2_25mM * 0.908;
+
+    const velocidadePico = velocidadeMedia * 0.99;
+    const velocidadePicoKmH = velocidadePico * 0.06;
+    const pacePico = 60 / velocidadePicoKmH;
+
+    const velocidadeLT = iat * 0.658;
+    const velocidadeLTKmH = velocidadeLT * 0.06;
+    const paceLT = 60 / velocidadeLTKmH;
+    const vo2LT = vo2_2mM * 0.844;
+
+    setCalculatedResults({
+      velocidadeMedia: velocidadeMedia.toFixed(2),
+      velocidadeKmH: velocidadeKmH.toFixed(2),
+      iat: iat.toFixed(2),
+      iatKmH: iatKmH.toFixed(2),
+      vo2max: vo2max.toFixed(2),
+      vo2_4mM: vo2_4mM.toFixed(2),
+      vo2_25mM: vo2_25mM.toFixed(2),
+      vo2_2mM: vo2_2mM.toFixed(2),
+      velocidadePico: velocidadePico.toFixed(2),
+      velocidadePicoKmH: velocidadePicoKmH.toFixed(2),
+      pacePico: pacePico.toFixed(2),
+      velocidadeLT: velocidadeLT.toFixed(2),
+      velocidadeLTKmH: velocidadeLTKmH.toFixed(2),
+      paceLT: paceLT.toFixed(2),
+      vo2LT: vo2LT.toFixed(2),
+    });
+
+    toast({
+      title: "Calculado!",
+      description: "Valores calculados com sucesso.",
+    });
+  };
+
+  const calculateVO2MaxUntrained = () => {
+    if (!testMinutes || !testSeconds) {
+      toast({
+        title: "Erro",
+        description: "Preencha minutos e segundos",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const distance = parseFloat(testDistance);
+    const minutes = parseFloat(testMinutes);
+    const seconds = parseFloat(testSeconds);
+    const totalMinutes = minutes + seconds / 60;
+
+    const velocidadeMedia = distance / totalMinutes;
+    const velocidadeKmH = velocidadeMedia * 0.06;
+    const iat = velocidadeMedia * 0.862;
+    const iatKmH = iat * 0.06;
+
+    const vo2max = 0.0193 * velocidadeMedia + 4.374;
+    const vo2_4mM = vo2max * 0.899;
+    const vo2_25mM = vo2_4mM * 0.883;
+    const vo2_2mM = vo2_25mM * 0.939;
+
+    const velocidadePico = velocidadeMedia * 1.152;
+    const velocidadePicoKmH = velocidadePico * 0.06;
+    const pacePico = 60 / velocidadePicoKmH;
+
+    const velocidadeLT = iat * 0.748;
+    const velocidadeLTKmH = velocidadeLT * 0.06;
+    const paceLT = 60 / velocidadeLTKmH;
+    const vo2LT = vo2_2mM * 0.776;
+
+    setCalculatedResults({
+      velocidadeMedia: velocidadeMedia.toFixed(2),
+      velocidadeKmH: velocidadeKmH.toFixed(2),
+      iat: iat.toFixed(2),
+      iatKmH: iatKmH.toFixed(2),
+      vo2max: vo2max.toFixed(2),
+      vo2_4mM: vo2_4mM.toFixed(2),
+      vo2_25mM: vo2_25mM.toFixed(2),
+      vo2_2mM: vo2_2mM.toFixed(2),
+      velocidadePico: velocidadePico.toFixed(2),
+      velocidadePicoKmH: velocidadePicoKmH.toFixed(2),
+      pacePico: pacePico.toFixed(2),
+      velocidadeLT: velocidadeLT.toFixed(2),
+      velocidadeLTKmH: velocidadeLTKmH.toFixed(2),
+      paceLT: paceLT.toFixed(2),
+      vo2LT: vo2LT.toFixed(2),
+    });
+
+    toast({
+      title: "Calculado!",
+      description: "Valores calculados com sucesso.",
+    });
+  };
+
+  const calculateIAT = () => {
+    if (!testMinutes || !testSeconds) {
+      toast({
+        title: "Erro",
+        description: "Preencha minutos e segundos",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const distance = parseFloat(testDistance);
+    const minutes = parseFloat(testMinutes);
+    const seconds = parseFloat(testSeconds);
+    const totalMinutes = minutes + seconds / 60;
+
+    const velocidadeMedia = distance / totalMinutes;
+    const iat = velocidadeMedia * 0.879;
+    const iatKmH = iat * 0.06;
+
+    setCalculatedResults({
+      velocidadeMedia: velocidadeMedia.toFixed(2),
+      iat: iat.toFixed(2),
+      iatKmH: iatKmH.toFixed(2),
+    });
+
+    toast({
+      title: "Calculado!",
+      description:
+        "IAT calculado com sucesso. Para testes completos use as abas de Homens Treinados ou Destreinados.",
+    });
+  };
 
   return (
     <div className="p-6 space-y-6">
@@ -310,326 +471,710 @@ export default function Running() {
       </Card>
 
       {selectedAthleteId && (
-        <>
-          <Card>
-            <CardHeader>
-              <CardTitle>Informações do Plano</CardTitle>
-              <CardDescription>
-                Configure as informações gerais do plano de corrida
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium">Nome do atleta:</label>
-                  <Input
-                    value={selectedAthlete?.name || ""}
-                    disabled
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Data do início:</label>
-                  <Input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="mt-1"
-                    data-testid="input-start-date"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-4 gap-4">
-                <div>
-                  <label className="text-sm font-medium">VO1:</label>
-                  <Input
-                    value={vo1}
-                    onChange={(e) => setVo1(e.target.value)}
-                    placeholder="VO1"
-                    className="mt-1"
-                    data-testid="input-vo1"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">VO2:</label>
-                  <Input
-                    value={vo2}
-                    onChange={(e) => setVo2(e.target.value)}
-                    placeholder="VO2"
-                    className="mt-1"
-                    data-testid="input-vo2"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">VO2lt:</label>
-                  <Input
-                    value={vo2lt}
-                    onChange={(e) => setVo2lt(e.target.value)}
-                    placeholder="VO2lt"
-                    className="mt-1"
-                    data-testid="input-vo2lt"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">VO2Dmax:</label>
-                  <Input
-                    value={vo2max}
-                    onChange={(e) => setVo2max(e.target.value)}
-                    placeholder="VO2Dmax"
-                    className="mt-1"
-                    data-testid="input-vo2max"
-                  />
-                </div>
-              </div>
-
+        <Card>
+          <CardHeader>
+            <CardTitle>Informações do Plano</CardTitle>
+            <CardDescription>
+              Configure as informações gerais do plano de corrida
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-medium">
-                  Explicação dos TF:
-                </label>
-                <Textarea
-                  value={tfExplanation}
-                  onChange={(e) => setTfExplanation(e.target.value)}
-                  placeholder="Digite a explicação dos tipos de treino (TF)..."
+                <label className="text-sm font-medium">Nome do atleta:</label>
+                <Input
+                  value={selectedAthlete?.name || ""}
+                  disabled
                   className="mt-1"
-                  data-testid="textarea-tf-explanation"
                 />
               </div>
-
-              <div className="flex justify-end">
-                <Button
-                  onClick={handleSavePlan}
-                  disabled={savePlanMutation.isPending}
-                  data-testid="button-save-plan"
-                >
-                  {savePlanMutation.isPending
-                    ? "Salvando..."
-                    : "Salvar Informações do Plano"}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
               <div>
-                <CardTitle>Treinos Semanais</CardTitle>
-                <CardDescription>
-                  Configure os treinos por semana
-                </CardDescription>
+                <label className="text-sm font-medium">Data do início:</label>
+                <Input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="mt-1"
+                  data-testid="input-start-date"
+                />
               </div>
-              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button
-                    data-testid="button-add-workout"
-                    disabled={!selectedAthleteId}
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Adicionar Treino
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-2xl">
-                  <DialogHeader>
-                    <DialogTitle>Novo Treino</DialogTitle>
-                    <DialogDescription>
-                      Adicione um novo treino de corrida
-                    </DialogDescription>
-                  </DialogHeader>
-                  <Form {...form}>
-                    <form
-                      onSubmit={form.handleSubmit(onSubmit)}
-                      className="space-y-4"
-                    >
-                      <FormField
-                        control={form.control}
-                        name="weekNumber"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Semana</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                placeholder="Ex: 1, 2, 3..."
-                                data-testid="input-week-number"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="dayName"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Dia</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="Ex: Segunda, Terça, Quarta..."
-                                data-testid="input-day-name"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="training"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Treino</FormLabel>
-                            <FormControl>
-                              <Textarea
-                                placeholder="Descrição do treino..."
-                                data-testid="input-training"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="distance"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Distância</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="Ex: 8km, 10km..."
-                                data-testid="input-distance"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="observations"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Observações</FormLabel>
-                            <FormControl>
-                              <Textarea
-                                placeholder="Observações sobre o treino..."
-                                data-testid="input-observations"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => setIsDialogOpen(false)}
-                        >
-                          Cancelar
-                        </Button>
-                        <Button
-                          type="submit"
-                          disabled={createMutation.isPending}
-                          data-testid="button-submit-workout"
-                        >
-                          {createMutation.isPending
-                            ? "Salvando..."
-                            : "Salvar Treino"}
-                        </Button>
-                      </div>
-                    </form>
-                  </Form>
-                </DialogContent>
-              </Dialog>
-            </CardHeader>
-            <CardContent>
-              {workoutsLoading ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  Carregando treinos...
+            </div>
+
+            <div>
+              <label className="text-sm font-medium">Explicação dos TF:</label>
+              <Textarea
+                value={tfExplanation}
+                onChange={(e) => setTfExplanation(e.target.value)}
+                placeholder="Digite a explicação dos tipos de treino (TF)..."
+                className="mt-1"
+                data-testid="textarea-tf-explanation"
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {selectedAthleteId && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Calculadora de VO2max e Limiares</CardTitle>
+            <CardDescription>
+              Calcule VO2max e limiares baseado em testes de corrida e salve no
+              plano
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="trained" className="space-y-4">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="trained" data-testid="tab-trained">
+                  Homens Treinados
+                </TabsTrigger>
+                <TabsTrigger value="untrained" data-testid="tab-untrained">
+                  Mulheres/Homens Destreinados
+                </TabsTrigger>
+                <TabsTrigger value="iat" data-testid="tab-iat">
+                  IAT
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="trained" className="space-y-4">
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="text-sm font-medium">Distância (m)</label>
+                    <Input
+                      type="number"
+                      value={testDistance}
+                      onChange={(e) => setTestDistance(e.target.value)}
+                      placeholder="3200"
+                      data-testid="input-distance-trained"
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Minutos</label>
+                    <Input
+                      type="number"
+                      value={testMinutes}
+                      onChange={(e) => setTestMinutes(e.target.value)}
+                      placeholder="15"
+                      data-testid="input-minutes-trained"
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Segundos</label>
+                    <Input
+                      type="number"
+                      value={testSeconds}
+                      onChange={(e) => setTestSeconds(e.target.value)}
+                      placeholder="47"
+                      data-testid="input-seconds-trained"
+                      className="mt-1"
+                    />
+                  </div>
                 </div>
-              ) : workouts.length === 0 ? (
-                <div
-                  className="text-center py-8 text-muted-foreground"
-                  data-testid="text-no-workouts"
+
+                <Button
+                  onClick={calculateVO2MaxTrainedMen}
+                  data-testid="button-calculate-trained"
+                  className="w-full"
                 >
-                  Nenhum treino cadastrado. Clique em "Adicionar Treino" para
-                  começar.
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  {Object.keys(groupedWorkouts)
-                    .sort((a, b) => parseInt(a) - parseInt(b))
-                    .map((weekNum) => (
-                      <div key={weekNum} className="space-y-2">
-                        <h3 className="font-bold text-lg bg-yellow-400 text-black px-2 py-1">
-                          Semana {weekNum}
-                        </h3>
-                        <div className="border rounded-lg overflow-hidden">
-                          <Table>
-                            <TableHeader className="bg-yellow-400">
-                              <TableRow>
-                                <TableHead className="font-bold text-black">
-                                  Dia
-                                </TableHead>
-                                <TableHead className="font-bold text-black">
-                                  Treino
-                                </TableHead>
-                                <TableHead className="font-bold text-black">
-                                  Distância
-                                </TableHead>
-                                <TableHead className="font-bold text-black">
-                                  Observações
-                                </TableHead>
-                                <TableHead className="w-[80px]"></TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {groupedWorkouts[parseInt(weekNum)].map(
-                                (workout) => (
-                                  <TableRow
-                                    key={workout.id}
-                                    data-testid="row-workout"
-                                  >
-                                    <TableCell className="font-medium">
-                                      {workout.dayName}
-                                    </TableCell>
-                                    <TableCell>{workout.training}</TableCell>
-                                    <TableCell>
-                                      {workout.distance || "-"}
-                                    </TableCell>
-                                    <TableCell className="max-w-xs truncate">
-                                      {workout.observations || "-"}
-                                    </TableCell>
-                                    <TableCell>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() => handleDelete(workout.id)}
-                                        data-testid="button-delete-workout"
-                                      >
-                                        <Trash2 className="h-4 w-4 text-destructive" />
-                                      </Button>
-                                    </TableCell>
-                                  </TableRow>
-                                )
-                              )}
-                            </TableBody>
-                          </Table>
+                  Calcular
+                </Button>
+
+                {calculatedResults && (
+                  <div className="mt-4 p-4 bg-muted rounded-lg space-y-3">
+                    <h3 className="font-bold text-lg">
+                      {calculatedResults.vo2_4mM
+                        ? "Resultados Calculados"
+                        : "Valores Salvos"}
+                    </h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      {calculatedResults.velocidadeMedia && (
+                        <div>
+                          <p className="text-sm text-muted-foreground">
+                            Velocidade Média
+                          </p>
+                          <p
+                            className="font-semibold"
+                            data-testid="result-vel-media"
+                          >
+                            {calculatedResults.velocidadeMedia} m/min (
+                            {calculatedResults.velocidadeKmH} km/h)
+                          </p>
                         </div>
-                      </div>
-                    ))}
+                      )}
+                      {calculatedResults.iatKmH && (
+                        <div>
+                          <p className="text-sm text-muted-foreground">IAT</p>
+                          <p className="font-semibold" data-testid="result-iat">
+                            {calculatedResults.iat
+                              ? `${calculatedResults.iat} m/min (${calculatedResults.iatKmH} km/h)`
+                              : `${calculatedResults.iatKmH} km/h`}
+                          </p>
+                        </div>
+                      )}
+                      {calculatedResults.vo2max && (
+                        <div>
+                          <p className="text-sm text-muted-foreground">
+                            VO2max
+                          </p>
+                          <p
+                            className="font-semibold"
+                            data-testid="result-vo2max"
+                          >
+                            {calculatedResults.vo2max} ml/min/kg
+                          </p>
+                        </div>
+                      )}
+                      {calculatedResults.velocidadePicoKmH && (
+                        <div>
+                          <p className="text-sm text-muted-foreground">
+                            Velocidade Pico
+                          </p>
+                          <p className="font-semibold">
+                            {calculatedResults.velocidadePicoKmH} km/h{" "}
+                            {calculatedResults.pacePico &&
+                              `(Pace: ${calculatedResults.pacePico} min/km)`}
+                          </p>
+                        </div>
+                      )}
+                      {calculatedResults.velocidadeLTKmH && (
+                        <div>
+                          <p className="text-sm text-muted-foreground">
+                            Velocidade LT
+                          </p>
+                          <p className="font-semibold">
+                            {calculatedResults.velocidadeLTKmH} km/h{" "}
+                            {calculatedResults.paceLT &&
+                              `(Pace: ${calculatedResults.paceLT} min/km)`}
+                          </p>
+                        </div>
+                      )}
+                      {calculatedResults.vo2_4mM && (
+                        <>
+                          <div>
+                            <p className="text-sm text-muted-foreground">
+                              VO2 4.0mM
+                            </p>
+                            <p className="font-semibold">
+                              {calculatedResults.vo2_4mM} ml/min/kg
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">
+                              VO2 2.5mM
+                            </p>
+                            <p className="font-semibold">
+                              {calculatedResults.vo2_25mM} ml/min/kg
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">
+                              VO2 2.0mM
+                            </p>
+                            <p className="font-semibold">
+                              {calculatedResults.vo2_2mM} ml/min/kg
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">
+                              VO2 LT
+                            </p>
+                            <p className="font-semibold">
+                              {calculatedResults.vo2LT} ml/min/kg
+                            </p>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                    {!calculatedResults.vo2_4mM && (
+                      <p className="text-sm text-muted-foreground text-center py-2">
+                        Calcule novamente para ver todos os detalhes
+                      </p>
+                    )}
+                    <Button
+                      onClick={() => savePlanMutation.mutate()}
+                      disabled={savePlanMutation.isPending}
+                      data-testid="button-save-to-plan-trained"
+                      className="w-full mt-4"
+                    >
+                      {savePlanMutation.isPending
+                        ? "Salvando..."
+                        : calculatedResults.vo2_4mM
+                        ? "Salvar Plano"
+                        : "Atualizar Plano"}
+                    </Button>
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="untrained" className="space-y-4">
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="text-sm font-medium">Distância (m)</label>
+                    <Input
+                      type="number"
+                      value={testDistance}
+                      onChange={(e) => setTestDistance(e.target.value)}
+                      placeholder="3200"
+                      data-testid="input-distance-untrained"
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Minutos</label>
+                    <Input
+                      type="number"
+                      value={testMinutes}
+                      onChange={(e) => setTestMinutes(e.target.value)}
+                      placeholder="22"
+                      data-testid="input-minutes-untrained"
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Segundos</label>
+                    <Input
+                      type="number"
+                      value={testSeconds}
+                      onChange={(e) => setTestSeconds(e.target.value)}
+                      placeholder="0"
+                      data-testid="input-seconds-untrained"
+                      className="mt-1"
+                    />
+                  </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </>
+
+                <Button
+                  onClick={calculateVO2MaxUntrained}
+                  data-testid="button-calculate-untrained"
+                  className="w-full"
+                >
+                  Calcular
+                </Button>
+
+                {calculatedResults && (
+                  <div className="mt-4 p-4 bg-muted rounded-lg space-y-3">
+                    <h3 className="font-bold text-lg">
+                      {calculatedResults.vo2_4mM
+                        ? "Resultados Calculados"
+                        : "Valores Salvos"}
+                    </h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      {calculatedResults.velocidadeMedia && (
+                        <div>
+                          <p className="text-sm text-muted-foreground">
+                            Velocidade Média
+                          </p>
+                          <p
+                            className="font-semibold"
+                            data-testid="result-vel-media"
+                          >
+                            {calculatedResults.velocidadeMedia} m/min (
+                            {calculatedResults.velocidadeKmH} km/h)
+                          </p>
+                        </div>
+                      )}
+                      {calculatedResults.iatKmH && (
+                        <div>
+                          <p className="text-sm text-muted-foreground">IAT</p>
+                          <p className="font-semibold" data-testid="result-iat">
+                            {calculatedResults.iat
+                              ? `${calculatedResults.iat} m/min (${calculatedResults.iatKmH} km/h)`
+                              : `${calculatedResults.iatKmH} km/h`}
+                          </p>
+                        </div>
+                      )}
+                      {calculatedResults.vo2max && (
+                        <div>
+                          <p className="text-sm text-muted-foreground">
+                            VO2max
+                          </p>
+                          <p
+                            className="font-semibold"
+                            data-testid="result-vo2max"
+                          >
+                            {calculatedResults.vo2max} ml/min/kg
+                          </p>
+                        </div>
+                      )}
+                      {calculatedResults.velocidadePicoKmH && (
+                        <div>
+                          <p className="text-sm text-muted-foreground">
+                            Velocidade Pico
+                          </p>
+                          <p className="font-semibold">
+                            {calculatedResults.velocidadePicoKmH} km/h{" "}
+                            {calculatedResults.pacePico &&
+                              `(Pace: ${calculatedResults.pacePico} min/km)`}
+                          </p>
+                        </div>
+                      )}
+                      {calculatedResults.velocidadeLTKmH && (
+                        <div>
+                          <p className="text-sm text-muted-foreground">
+                            Velocidade LT
+                          </p>
+                          <p className="font-semibold">
+                            {calculatedResults.velocidadeLTKmH} km/h{" "}
+                            {calculatedResults.paceLT &&
+                              `(Pace: ${calculatedResults.paceLT} min/km)`}
+                          </p>
+                        </div>
+                      )}
+                      {calculatedResults.vo2_4mM && (
+                        <>
+                          <div>
+                            <p className="text-sm text-muted-foreground">
+                              VO2 4.0mM
+                            </p>
+                            <p className="font-semibold">
+                              {calculatedResults.vo2_4mM} ml/min/kg
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">
+                              VO2 2.5mM
+                            </p>
+                            <p className="font-semibold">
+                              {calculatedResults.vo2_25mM} ml/min/kg
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">
+                              VO2 2.0mM
+                            </p>
+                            <p className="font-semibold">
+                              {calculatedResults.vo2_2mM} ml/min/kg
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">
+                              VO2 LT
+                            </p>
+                            <p className="font-semibold">
+                              {calculatedResults.vo2LT} ml/min/kg
+                            </p>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                    {!calculatedResults.vo2_4mM && (
+                      <p className="text-sm text-muted-foreground text-center py-2">
+                        Calcule novamente para ver todos os detalhes
+                      </p>
+                    )}
+                    <Button
+                      onClick={() => savePlanMutation.mutate()}
+                      disabled={savePlanMutation.isPending}
+                      data-testid="button-save-to-plan-untrained"
+                      className="w-full mt-4"
+                    >
+                      {savePlanMutation.isPending
+                        ? "Salvando..."
+                        : calculatedResults.vo2_4mM
+                        ? "Salvar Plano"
+                        : "Atualizar Plano"}
+                    </Button>
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="iat" className="space-y-4">
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="text-sm font-medium">Distância (m)</label>
+                    <Input
+                      type="number"
+                      value={testDistance}
+                      onChange={(e) => setTestDistance(e.target.value)}
+                      placeholder="3000"
+                      data-testid="input-distance-iat"
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Minutos</label>
+                    <Input
+                      type="number"
+                      value={testMinutes}
+                      onChange={(e) => setTestMinutes(e.target.value)}
+                      placeholder="17"
+                      data-testid="input-minutes-iat"
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Segundos</label>
+                    <Input
+                      type="number"
+                      value={testSeconds}
+                      onChange={(e) => setTestSeconds(e.target.value)}
+                      placeholder="19"
+                      data-testid="input-seconds-iat"
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+
+                <Button
+                  onClick={calculateIAT}
+                  data-testid="button-calculate-iat"
+                  className="w-full"
+                >
+                  Calcular
+                </Button>
+
+                {calculatedResults && (
+                  <div className="mt-4 p-4 bg-muted rounded-lg space-y-3">
+                    <h3 className="font-bold text-lg">Resultados</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm text-muted-foreground">
+                          Velocidade Média
+                        </p>
+                        <p
+                          className="font-semibold"
+                          data-testid="result-vel-media"
+                        >
+                          {calculatedResults.velocidadeMedia} m/min
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">IAT</p>
+                        <p className="font-semibold" data-testid="result-iat">
+                          {calculatedResults.iat} m/min (
+                          {calculatedResults.iatKmH} km/h)
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+      )}
+
+      {selectedAthleteId && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Treinos Semanais</CardTitle>
+              <CardDescription>Configure os treinos por semana</CardDescription>
+            </div>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  data-testid="button-add-workout"
+                  disabled={!selectedAthleteId}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Adicionar Treino
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Novo Treino</DialogTitle>
+                  <DialogDescription>
+                    Adicione um novo treino de corrida
+                  </DialogDescription>
+                </DialogHeader>
+                <Form {...form}>
+                  <form
+                    onSubmit={form.handleSubmit(onSubmit)}
+                    className="space-y-4"
+                  >
+                    <FormField
+                      control={form.control}
+                      name="weekNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Semana</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              placeholder="Ex: 1, 2, 3..."
+                              data-testid="input-week-number"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="dayName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Dia</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="Ex: Segunda, Terça, Quarta..."
+                              data-testid="input-day-name"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="training"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Treino</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              placeholder="Descrição do treino..."
+                              data-testid="input-training"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="distance"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Distância</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="Ex: 8km, 10km..."
+                              data-testid="input-distance"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="observations"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Observações</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              placeholder="Observações sobre o treino..."
+                              data-testid="input-observations"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsDialogOpen(false)}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        type="submit"
+                        disabled={createMutation.isPending}
+                        data-testid="button-submit-workout"
+                      >
+                        {createMutation.isPending
+                          ? "Salvando..."
+                          : "Salvar Treino"}
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+          </CardHeader>
+          <CardContent>
+            {workoutsLoading ? (
+              <div className="text-center py-8 text-muted-foreground">
+                Carregando treinos...
+              </div>
+            ) : workouts.length === 0 ? (
+              <div
+                className="text-center py-8 text-muted-foreground"
+                data-testid="text-no-workouts"
+              >
+                Nenhum treino cadastrado. Clique em "Adicionar Treino" para
+                começar.
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {Object.keys(groupedWorkouts)
+                  .sort((a, b) => parseInt(a) - parseInt(b))
+                  .map((weekNum) => (
+                    <div key={weekNum} className="space-y-2">
+                      <h3 className="font-bold text-lg bg-yellow-400 text-black px-2 py-1">
+                        Semana {weekNum}
+                      </h3>
+                      <div className="border rounded-lg overflow-hidden">
+                        <Table>
+                          <TableHeader className="bg-yellow-400">
+                            <TableRow>
+                              <TableHead className="font-bold text-black">
+                                Dia
+                              </TableHead>
+                              <TableHead className="font-bold text-black">
+                                Treino
+                              </TableHead>
+                              <TableHead className="font-bold text-black">
+                                Distância
+                              </TableHead>
+                              <TableHead className="font-bold text-black">
+                                Observações
+                              </TableHead>
+                              <TableHead className="w-[80px]"></TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {groupedWorkouts[parseInt(weekNum)].map(
+                              (workout) => (
+                                <TableRow
+                                  key={workout.id}
+                                  data-testid="row-workout"
+                                >
+                                  <TableCell className="font-medium">
+                                    {workout.dayName}
+                                  </TableCell>
+                                  <TableCell>{workout.training}</TableCell>
+                                  <TableCell>
+                                    {workout.distance || "-"}
+                                  </TableCell>
+                                  <TableCell className="max-w-xs truncate">
+                                    {workout.observations || "-"}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => handleDelete(workout.id)}
+                                      data-testid="button-delete-workout"
+                                    >
+                                      <Trash2 className="h-4 w-4 text-destructive" />
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                              )
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
     </div>
   );
