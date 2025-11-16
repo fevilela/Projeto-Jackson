@@ -31,6 +31,7 @@ import {
   ClipboardCheck,
   Weight,
   Layers,
+  FileText,
 } from "lucide-react";
 
 const cadastroItems = [
@@ -52,6 +53,11 @@ const cadastroItems = [
 ];
 
 const otherMenuItems = [
+  {
+    title: "Anamnese",
+    url: "/anamnese",
+    icon: FileText,
+  },
   {
     title: "Teste/Movimento",
     url: "/tests",

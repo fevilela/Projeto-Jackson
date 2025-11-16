@@ -361,3 +361,47 @@ export type InsertFunctionalAssessmentValue = z.infer<
 >;
 export type FunctionalAssessmentValue =
   typeof functionalAssessmentValues.$inferSelect;
+
+// Anamnesis (Anamnese)
+export const anamnesis = pgTable("anamnesis", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  athleteId: varchar("athlete_id")
+    .notNull()
+    .references(() => athletes.id, { onDelete: "cascade" }),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  anamnesisDate: text("anamnesis_date").notNull(),
+  mainGoal: text("main_goal"),
+  medicalHistory: text("medical_history"),
+  injuries: text("injuries"),
+  medications: text("medications"),
+  surgeries: text("surgeries"),
+  allergies: text("allergies"),
+  familyHistory: text("family_history"),
+  lifestyle: text("lifestyle"),
+  sleepQuality: text("sleep_quality"),
+  nutrition: text("nutrition"),
+  currentActivityLevel: text("current_activity_level"),
+  previousSports: text("previous_sports"),
+  additionalNotes: text("additional_notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertAnamnesisSchema = createInsertSchema(anamnesis).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateAnamnesisSchema = createInsertSchema(anamnesis).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertAnamnesis = z.infer<typeof insertAnamnesisSchema>;
+export type Anamnesis = typeof anamnesis.$inferSelect;

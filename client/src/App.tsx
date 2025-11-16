@@ -18,6 +18,7 @@ import Running from "@/pages/Running";
 import Periodization from "@/pages/Periodization";
 import Strength from "@/pages/Strength";
 import Assessment from "@/pages/Assessment";
+import Anamnese from "@/pages/Anamnese";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import NotFound from "@/pages/not-found";
@@ -60,6 +61,7 @@ function MainLayout() {
               <Route path="/periodization" component={Periodization} />
               <Route path="/strength" component={Strength} />
               <Route path="/assessment" component={Assessment} />
+              <Route path="/anamnese" component={Anamnese} />
               <Route component={NotFound} />
             </Switch>
           </main>

@@ -15,6 +15,8 @@ import {
   insertExerciseSchema,
   insertMovementTypeSchema,
   insertMovementFieldSchema,
+  insertAnamnesisSchema,
+  updateAnamnesisSchema,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -634,6 +636,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
   );
+
+  // Anamnesis routes
+  app.get(
+    "/api/anamnesis/athlete/:athleteId",
+    requireAuth,
+    async (req, res, next) => {
+      try {
+        const anamnesisData = await storage.getAnamnesisByAthleteId(
+          req.params.athleteId,
+          req.session.userId!
+        );
+        res.json(anamnesisData);
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  app.get("/api/anamnesis/:id", requireAuth, async (req, res, next) => {
+    try {
+      const anamnesis = await storage.getAnamnesis(
+        req.params.id,
+        req.session.userId!
+      );
+      if (!anamnesis) {
+        return res.status(404).json({ error: "Anamnese não encontrada" });
+      }
+      res.json(anamnesis);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/anamnesis", requireAuth, async (req, res, next) => {
+    try {
+      const anamnesisData = insertAnamnesisSchema.parse({
+        ...req.body,
+        userId: req.session.userId,
+      });
+
+      if (!anamnesisData.athleteId) {
+        return res.status(400).json({ error: "athleteId é obrigatório" });
+      }
+
+      const athlete = await storage.getAthlete(anamnesisData.athleteId);
+      if (!athlete || athlete.userId !== req.session.userId) {
+        return res
+          .status(403)
+          .json({ error: "Atleta não encontrado ou não autorizado" });
+      }
+
+      const anamnesis = await storage.createAnamnesis(anamnesisData);
+      res.json(anamnesis);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.patch("/api/anamnesis/:id", requireAuth, async (req, res, next) => {
+    try {
+      const updateData = updateAnamnesisSchema.parse(req.body);
+
+      const anamnesis = await storage.updateAnamnesis(
+        req.params.id,
+        req.session.userId!,
+        updateData
+      );
+      res.json(anamnesis);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.delete("/api/anamnesis/:id", requireAuth, async (req, res, next) => {
+    try {
+      await storage.deleteAnamnesis(req.params.id, req.session.userId!);
+      res.json({ message: "Anamnese excluída com sucesso" });
+    } catch (error) {
+      next(error);
+    }
+  });
 
   const httpServer = createServer(app);
 

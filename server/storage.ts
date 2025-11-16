@@ -14,6 +14,7 @@ import {
   movementTypes,
   movementFields,
   functionalAssessmentValues,
+  anamnesis,
   type User,
   type InsertUser,
   type Athlete,
@@ -40,6 +41,8 @@ import {
   type InsertMovementField,
   type FunctionalAssessmentValue,
   type InsertFunctionalAssessmentValue,
+  type Anamnesis,
+  type InsertAnamnesis,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -154,6 +157,20 @@ export interface IStorage {
     movementTypeId: string,
     userId: string
   ): Promise<void>;
+
+  // Anamnesis methods
+  getAnamnesisByAthleteId(
+    athleteId: string,
+    userId: string
+  ): Promise<Anamnesis[]>;
+  getAnamnesis(id: string, userId: string): Promise<Anamnesis | undefined>;
+  createAnamnesis(anamnesis: InsertAnamnesis): Promise<Anamnesis>;
+  updateAnamnesis(
+    id: string,
+    userId: string,
+    anamnesis: Partial<InsertAnamnesis>
+  ): Promise<Anamnesis>;
+  deleteAnamnesis(id: string, userId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -665,6 +682,62 @@ export class DatabaseStorage implements IStorage {
           eq(movementFields.movementTypeId, movementTypeId)
         )
       );
+  }
+
+  // Anamnesis methods
+  async getAnamnesisByAthleteId(
+    athleteId: string,
+    userId: string
+  ): Promise<Anamnesis[]> {
+    return await db
+      .select()
+      .from(anamnesis)
+      .where(
+        and(eq(anamnesis.athleteId, athleteId), eq(anamnesis.userId, userId))
+      )
+      .orderBy(desc(anamnesis.createdAt));
+  }
+
+  async getAnamnesis(
+    id: string,
+    userId: string
+  ): Promise<Anamnesis | undefined> {
+    const result = await db
+      .select()
+      .from(anamnesis)
+      .where(and(eq(anamnesis.id, id), eq(anamnesis.userId, userId)))
+      .limit(1);
+    return result[0];
+  }
+
+  async createAnamnesis(insertAnamnesis: InsertAnamnesis): Promise<Anamnesis> {
+    const result = await db
+      .insert(anamnesis)
+      .values(insertAnamnesis)
+      .returning();
+    return result[0];
+  }
+
+  async updateAnamnesis(
+    id: string,
+    userId: string,
+    updateData: Partial<InsertAnamnesis>
+  ): Promise<Anamnesis> {
+    const result = await db
+      .update(anamnesis)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(and(eq(anamnesis.id, id), eq(anamnesis.userId, userId)))
+      .returning();
+    if (!result[0]) {
+      throw new Error("Anamnese não encontrada ou não autorizada");
+    }
+    return result[0];
+  }
+
+  async deleteAnamnesis(id: string, userId: string): Promise<void> {
+    await db
+      .delete(anamnesis)
+      .where(and(eq(anamnesis.id, id), eq(anamnesis.userId, userId)));
   }
 }
 

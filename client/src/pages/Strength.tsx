@@ -53,6 +53,15 @@ interface Athlete {
   name: string;
 }
 
+interface Exercise {
+  id: string;
+  userId: string;
+  name: string;
+  category: string;
+  description: string | null;
+  createdAt: string;
+}
+
 interface StrengthExercise {
   id: string;
   athleteId: string;
@@ -85,12 +94,17 @@ export default function Strength() {
     queryKey: ["/api", "athletes"],
   });
 
-  const { data: exercises = [], isLoading: exercisesLoading } = useQuery<
-    StrengthExercise[]
+  const { data: catalogExercises = [], isLoading: catalogLoading } = useQuery<
+    Exercise[]
   >({
-    queryKey: ["/api/strength-exercises/athlete", selectedAthleteId],
-    enabled: !!selectedAthleteId,
+    queryKey: ["/api/exercises"],
   });
+
+  const { data: strengthExercises = [], isLoading: strengthExercisesLoading } =
+    useQuery<StrengthExercise[]>({
+      queryKey: ["/api/strength-exercises/athlete", selectedAthleteId],
+      enabled: !!selectedAthleteId,
+    });
 
   const form = useForm<ExerciseFormValues>({
     resolver: zodResolver(exerciseFormSchema),
@@ -254,13 +268,53 @@ export default function Strength() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Exercício</FormLabel>
-                          <FormControl>
-                            <Input
-                              placeholder="Ex: Agachamento livre"
-                              data-testid="input-exercise"
-                              {...field}
-                            />
-                          </FormControl>
+                          <Select
+                            onValueChange={field.onChange}
+                            value={field.value}
+                            disabled={
+                              catalogLoading ||
+                              (!catalogLoading && catalogExercises.length === 0)
+                            }
+                          >
+                            <FormControl>
+                              <SelectTrigger data-testid="select-exercise">
+                                <SelectValue
+                                  placeholder={
+                                    catalogLoading
+                                      ? "Carregando exercícios..."
+                                      : catalogExercises.length === 0
+                                      ? "Nenhum exercício cadastrado"
+                                      : "Selecione um exercício"
+                                  }
+                                />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {catalogLoading ? (
+                                <div
+                                  className="p-2 text-sm text-muted-foreground text-center"
+                                  data-testid="text-loading-exercises"
+                                >
+                                  Carregando exercícios...
+                                </div>
+                              ) : catalogExercises.length === 0 ? (
+                                <div
+                                  className="p-2 text-sm text-muted-foreground text-center"
+                                  data-testid="text-no-catalog-exercises"
+                                >
+                                  Cadastre exercícios primeiro na aba "Cadastro
+                                  de Exercícios"
+                                </div>
+                              ) : (
+                                catalogExercises.map((ex) => (
+                                  <SelectItem key={ex.id} value={ex.name}>
+                                    {ex.name}{" "}
+                                    {ex.category && `(${ex.category})`}
+                                  </SelectItem>
+                                ))
+                              )}
+                            </SelectContent>
+                          </Select>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -342,11 +396,11 @@ export default function Strength() {
             </Dialog>
           </CardHeader>
           <CardContent>
-            {exercisesLoading ? (
+            {strengthExercisesLoading ? (
               <div className="text-center py-8 text-muted-foreground">
                 Carregando exercícios...
               </div>
-            ) : exercises.length === 0 ? (
+            ) : strengthExercises.length === 0 ? (
               <div
                 className="text-center py-8 text-muted-foreground"
                 data-testid="text-no-exercises"
@@ -372,7 +426,7 @@ export default function Strength() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {exercises.map((exercise) => (
+                    {strengthExercises.map((exercise) => (
                       <TableRow key={exercise.id} data-testid="row-exercise">
                         <TableCell className="font-medium">
                           {exercise.block}
