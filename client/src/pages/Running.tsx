@@ -4,7 +4,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Trash2, Plus } from "lucide-react";
+import { Trash2, Plus, ChevronDown } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -12,6 +12,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
@@ -96,6 +102,7 @@ export default function Running() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [startDate, setStartDate] = useState("");
   const [tfExplanation, setTfExplanation] = useState("");
+  const [isHistoryOpen, setIsHistoryOpen] = useState(true);
 
   const [testDistance, setTestDistance] = useState("3200");
   const [testMinutes, setTestMinutes] = useState("");
@@ -180,29 +187,16 @@ export default function Running() {
         tfExplanation: tfExplanation || null,
       };
 
-      if (currentPlan) {
-        const response = await apiRequest(
-          "PATCH",
-          `/api/running-plans/${currentPlan.id}`,
-          planData
-        );
-        return response.json();
-      } else {
-        const response = await apiRequest(
-          "POST",
-          "/api/running-plans",
-          planData
-        );
-        return response.json();
-      }
+      const response = await apiRequest("POST", "/api/running-plans", planData);
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["/api/running-plans/athlete", selectedAthleteId],
       });
       toast({
-        title: "Plano salvo com sucesso!",
-        description: "Data, valores calculados e explicação foram salvos.",
+        title: "Plano salvo no histórico!",
+        description: "Um novo plano foi adicionado ao histórico com sucesso.",
       });
     },
     onError: (error: Error) => {
@@ -304,6 +298,7 @@ export default function Running() {
     const velocidadeKmH = velocidadeMedia * 0.06;
     const iat = velocidadeMedia * 0.892;
     const iatKmH = iat * 0.06;
+    const paceIAT = 60 / iatKmH;
 
     const vo2max = 0.0193 * velocidadeMedia + 4.374;
     const vo2_4mM = vo2max * 0.886;
@@ -324,6 +319,7 @@ export default function Running() {
       velocidadeKmH: velocidadeKmH.toFixed(2),
       iat: iat.toFixed(2),
       iatKmH: iatKmH.toFixed(2),
+      paceIAT: paceIAT.toFixed(2),
       vo2max: vo2max.toFixed(2),
       vo2_4mM: vo2_4mM.toFixed(2),
       vo2_25mM: vo2_25mM.toFixed(2),
@@ -362,6 +358,7 @@ export default function Running() {
     const velocidadeKmH = velocidadeMedia * 0.06;
     const iat = velocidadeMedia * 0.862;
     const iatKmH = iat * 0.06;
+    const paceIAT = 60 / iatKmH;
 
     const vo2max = 0.0193 * velocidadeMedia + 4.374;
     const vo2_4mM = vo2max * 0.899;
@@ -382,6 +379,7 @@ export default function Running() {
       velocidadeKmH: velocidadeKmH.toFixed(2),
       iat: iat.toFixed(2),
       iatKmH: iatKmH.toFixed(2),
+      paceIAT: paceIAT.toFixed(2),
       vo2max: vo2max.toFixed(2),
       vo2_4mM: vo2_4mM.toFixed(2),
       vo2_25mM: vo2_25mM.toFixed(2),
@@ -604,16 +602,6 @@ export default function Running() {
                           </p>
                         </div>
                       )}
-                      {calculatedResults.iatKmH && (
-                        <div>
-                          <p className="text-sm text-muted-foreground">IAT</p>
-                          <p className="font-semibold" data-testid="result-iat">
-                            {calculatedResults.iat
-                              ? `${calculatedResults.iat} m/min (${calculatedResults.iatKmH} km/h)`
-                              : `${calculatedResults.iatKmH} km/h`}
-                          </p>
-                        </div>
-                      )}
                       {calculatedResults.vo2max && (
                         <div>
                           <p className="text-sm text-muted-foreground">
@@ -627,27 +615,59 @@ export default function Running() {
                           </p>
                         </div>
                       )}
-                      {calculatedResults.velocidadePicoKmH && (
-                        <div>
-                          <p className="text-sm text-muted-foreground">
-                            Velocidade Pico
-                          </p>
-                          <p className="font-semibold">
-                            {calculatedResults.velocidadePicoKmH} km/h{" "}
-                            {calculatedResults.pacePico &&
-                              `(Pace: ${calculatedResults.pacePico} min/km)`}
+                      {calculatedResults.velocidadeLTKmH && (
+                        <div className="p-3 bg-green-50 border border-green-200 rounded">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge className="bg-green-600 text-white">
+                              LT
+                            </Badge>
+                            <p className="text-sm font-medium text-green-900">
+                              Velocidade LT
+                            </p>
+                          </div>
+                          <p className="font-semibold text-green-900">
+                            {calculatedResults.velocidadeLTKmH} km/h
+                            {calculatedResults.paceLT &&
+                              ` (Pace: ${calculatedResults.paceLT} min/km)`}
                           </p>
                         </div>
                       )}
-                      {calculatedResults.velocidadeLTKmH && (
-                        <div>
-                          <p className="text-sm text-muted-foreground">
-                            Velocidade LT
+                      {calculatedResults.iatKmH && (
+                        <div className="p-3 bg-purple-50 border border-purple-200 rounded">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge className="bg-purple-600 text-white">
+                              IAT
+                            </Badge>
+                            <p className="text-sm font-medium text-purple-900">
+                              Limiar Anaeróbio
+                            </p>
+                          </div>
+                          <p
+                            className="font-semibold text-purple-900"
+                            data-testid="result-iat"
+                          >
+                            {calculatedResults.iat
+                              ? `${calculatedResults.iat} m/min (${calculatedResults.iatKmH} km/h)`
+                              : `${calculatedResults.iatKmH} km/h`}
+                            {calculatedResults.paceIAT &&
+                              ` (Pace: ${calculatedResults.paceIAT} min/km)`}
                           </p>
-                          <p className="font-semibold">
-                            {calculatedResults.velocidadeLTKmH} km/h{" "}
-                            {calculatedResults.paceLT &&
-                              `(Pace: ${calculatedResults.paceLT} min/km)`}
+                        </div>
+                      )}
+                      {calculatedResults.velocidadePicoKmH && (
+                        <div className="p-3 bg-yellow-50 border border-yellow-200 rounded">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge className="bg-yellow-600 text-white">
+                              Vpico
+                            </Badge>
+                            <p className="text-sm font-medium text-yellow-900">
+                              Velocidade Pico
+                            </p>
+                          </div>
+                          <p className="font-semibold text-yellow-900">
+                            {calculatedResults.velocidadePicoKmH} km/h
+                            {calculatedResults.pacePico &&
+                              ` (Pace: ${calculatedResults.pacePico} min/km)`}
                           </p>
                         </div>
                       )}
@@ -701,10 +721,48 @@ export default function Running() {
                     >
                       {savePlanMutation.isPending
                         ? "Salvando..."
-                        : calculatedResults.vo2_4mM
-                        ? "Salvar Plano"
-                        : "Atualizar Plano"}
+                        : "Salvar no Histórico"}
                     </Button>
+                  </div>
+                )}
+
+                {calculatedResults && (
+                  <div className="mt-4 space-y-3">
+                    <h3 className="font-semibold text-base">
+                      Zonas de Treinamento:
+                    </h3>
+                    <div className="space-y-2">
+                      <div className="p-3 bg-green-100 border-l-4 border-green-600 rounded">
+                        <p className="font-semibold text-green-900">
+                          Limiar de lactato (LT)
+                        </p>
+                        <p className="text-sm text-green-800">
+                          Momento onde o lactato começa ficar mais alto do que
+                          em repouso = 0 indivíduo consegue manter essa
+                          intensidade por horas
+                        </p>
+                      </div>
+                      <div className="p-3 bg-purple-100 border-l-4 border-purple-600 rounded">
+                        <p className="font-semibold text-purple-900">
+                          Limiar anaeróbio (IAT)
+                        </p>
+                        <p className="text-sm text-purple-800">
+                          Aumento exponencial do lactato no sangue em níveis de
+                          restrição. Consegue manter essa intensidade por
+                          aproximadamente 30-40 minutos
+                        </p>
+                      </div>
+                      <div className="p-3 bg-yellow-100 border-l-4 border-yellow-600 rounded">
+                        <p className="font-semibold text-yellow-900">
+                          Velocidade aeróbia max (Vpico)
+                        </p>
+                        <p className="text-sm text-yellow-800">
+                          Velocidade aeróbia máxima do indivíduo, é possível
+                          manter essa intensidade por aproximadamente por 4-5
+                          minutos.
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 )}
               </TabsContent>
@@ -776,16 +834,6 @@ export default function Running() {
                           </p>
                         </div>
                       )}
-                      {calculatedResults.iatKmH && (
-                        <div>
-                          <p className="text-sm text-muted-foreground">IAT</p>
-                          <p className="font-semibold" data-testid="result-iat">
-                            {calculatedResults.iat
-                              ? `${calculatedResults.iat} m/min (${calculatedResults.iatKmH} km/h)`
-                              : `${calculatedResults.iatKmH} km/h`}
-                          </p>
-                        </div>
-                      )}
                       {calculatedResults.vo2max && (
                         <div>
                           <p className="text-sm text-muted-foreground">
@@ -799,27 +847,59 @@ export default function Running() {
                           </p>
                         </div>
                       )}
-                      {calculatedResults.velocidadePicoKmH && (
-                        <div>
-                          <p className="text-sm text-muted-foreground">
-                            Velocidade Pico
-                          </p>
-                          <p className="font-semibold">
-                            {calculatedResults.velocidadePicoKmH} km/h{" "}
-                            {calculatedResults.pacePico &&
-                              `(Pace: ${calculatedResults.pacePico} min/km)`}
+                      {calculatedResults.velocidadeLTKmH && (
+                        <div className="p-3 bg-green-50 border border-green-200 rounded">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge className="bg-green-600 text-white">
+                              LT
+                            </Badge>
+                            <p className="text-sm font-medium text-green-900">
+                              Velocidade LT
+                            </p>
+                          </div>
+                          <p className="font-semibold text-green-900">
+                            {calculatedResults.velocidadeLTKmH} km/h
+                            {calculatedResults.paceLT &&
+                              ` (Pace: ${calculatedResults.paceLT} min/km)`}
                           </p>
                         </div>
                       )}
-                      {calculatedResults.velocidadeLTKmH && (
-                        <div>
-                          <p className="text-sm text-muted-foreground">
-                            Velocidade LT
+                      {calculatedResults.iatKmH && (
+                        <div className="p-3 bg-purple-50 border border-purple-200 rounded">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge className="bg-purple-600 text-white">
+                              IAT
+                            </Badge>
+                            <p className="text-sm font-medium text-purple-900">
+                              Limiar Anaeróbio
+                            </p>
+                          </div>
+                          <p
+                            className="font-semibold text-purple-900"
+                            data-testid="result-iat"
+                          >
+                            {calculatedResults.iat
+                              ? `${calculatedResults.iat} m/min (${calculatedResults.iatKmH} km/h)`
+                              : `${calculatedResults.iatKmH} km/h`}
+                            {calculatedResults.paceIAT &&
+                              ` (Pace: ${calculatedResults.paceIAT} min/km)`}
                           </p>
-                          <p className="font-semibold">
-                            {calculatedResults.velocidadeLTKmH} km/h{" "}
-                            {calculatedResults.paceLT &&
-                              `(Pace: ${calculatedResults.paceLT} min/km)`}
+                        </div>
+                      )}
+                      {calculatedResults.velocidadePicoKmH && (
+                        <div className="p-3 bg-yellow-50 border border-yellow-200 rounded">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge className="bg-yellow-600 text-white">
+                              Vpico
+                            </Badge>
+                            <p className="text-sm font-medium text-yellow-900">
+                              Velocidade Pico
+                            </p>
+                          </div>
+                          <p className="font-semibold text-yellow-900">
+                            {calculatedResults.velocidadePicoKmH} km/h
+                            {calculatedResults.pacePico &&
+                              ` (Pace: ${calculatedResults.pacePico} min/km)`}
                           </p>
                         </div>
                       )}
@@ -873,10 +953,48 @@ export default function Running() {
                     >
                       {savePlanMutation.isPending
                         ? "Salvando..."
-                        : calculatedResults.vo2_4mM
-                        ? "Salvar Plano"
-                        : "Atualizar Plano"}
+                        : "Salvar no Histórico"}
                     </Button>
+                  </div>
+                )}
+
+                {calculatedResults && (
+                  <div className="mt-4 space-y-3">
+                    <h3 className="font-semibold text-base">
+                      Zonas de Treinamento:
+                    </h3>
+                    <div className="space-y-2">
+                      <div className="p-3 bg-green-100 border-l-4 border-green-600 rounded">
+                        <p className="font-semibold text-green-900">
+                          Limiar de lactato (LT)
+                        </p>
+                        <p className="text-sm text-green-800">
+                          Momento onde o lactato começa ficar mais alto do que
+                          em repouso = 0 indivíduo consegue manter essa
+                          intensidade por horas
+                        </p>
+                      </div>
+                      <div className="p-3 bg-purple-100 border-l-4 border-purple-600 rounded">
+                        <p className="font-semibold text-purple-900">
+                          Limiar anaeróbio (IAT)
+                        </p>
+                        <p className="text-sm text-purple-800">
+                          Aumento exponencial do lactato no sangue em níveis de
+                          restrição. Consegue manter essa intensidade por
+                          aproximadamente 30-40 minutos
+                        </p>
+                      </div>
+                      <div className="p-3 bg-yellow-100 border-l-4 border-yellow-600 rounded">
+                        <p className="font-semibold text-yellow-900">
+                          Velocidade aeróbia max (Vpico)
+                        </p>
+                        <p className="text-sm text-yellow-800">
+                          Velocidade aeróbia máxima do indivíduo, é possível
+                          manter essa intensidade por aproximadamente por 4-5
+                          minutos.
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 )}
               </TabsContent>
@@ -954,6 +1072,115 @@ export default function Running() {
               </TabsContent>
             </Tabs>
           </CardContent>
+        </Card>
+      )}
+
+      {selectedAthleteId && plans.length > 0 && (
+        <Card>
+          <Collapsible open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Histórico de Planos Salvos</CardTitle>
+                  <CardDescription>
+                    Visualize todos os planos salvos para este atleta
+                  </CardDescription>
+                </div>
+                <CollapsibleTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    data-testid="button-toggle-history"
+                  >
+                    <ChevronDown
+                      className={`h-4 w-4 transition-transform ${
+                        isHistoryOpen ? "rotate-180" : ""
+                      }`}
+                    />
+                  </Button>
+                </CollapsibleTrigger>
+              </div>
+            </CardHeader>
+            <CollapsibleContent>
+              <CardContent>
+                <div className="space-y-4">
+                  {plans.map((plan, index) => (
+                    <div
+                      key={plan.id}
+                      className={`p-4 rounded-lg border ${
+                        index === 0
+                          ? "bg-primary/5 border-primary"
+                          : "bg-muted border-border"
+                      }`}
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-semibold">
+                            {index === 0
+                              ? "Plano Atual"
+                              : `Plano ${plans.length - index}`}
+                          </h4>
+                          {plan.startDate && (
+                            <span className="text-sm text-muted-foreground">
+                              (Início:{" "}
+                              {new Date(plan.startDate).toLocaleDateString(
+                                "pt-BR"
+                              )}
+                              )
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          Salvo em:{" "}
+                          {new Date(plan.createdAt).toLocaleString("pt-BR")}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                        {plan.vo2lt && (
+                          <div>
+                            <p className="text-muted-foreground">
+                              Velocidade LT
+                            </p>
+                            <p className="font-semibold">{plan.vo2lt} km/h</p>
+                          </div>
+                        )}
+                        {plan.vo1 && (
+                          <div>
+                            <p className="text-muted-foreground">IAT</p>
+                            <p className="font-semibold">{plan.vo1} km/h</p>
+                          </div>
+                        )}
+                        {plan.vo2 && (
+                          <div>
+                            <p className="text-muted-foreground">
+                              Velocidade Pico
+                            </p>
+                            <p className="font-semibold">{plan.vo2} km/h</p>
+                          </div>
+                        )}
+                        {plan.vo2Dmax && (
+                          <div>
+                            <p className="text-muted-foreground">VO2max</p>
+                            <p className="font-semibold">
+                              {plan.vo2Dmax} ml/min/kg
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                      {plan.tfExplanation && (
+                        <div className="mt-3 pt-3 border-t">
+                          <p className="text-xs text-muted-foreground mb-1">
+                            Explicação dos TF:
+                          </p>
+                          <p className="text-sm">{plan.tfExplanation}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </CollapsibleContent>
+          </Collapsible>
         </Card>
       )}
 
@@ -1114,12 +1341,12 @@ export default function Running() {
                   .sort((a, b) => parseInt(a) - parseInt(b))
                   .map((weekNum) => (
                     <div key={weekNum} className="space-y-2">
-                      <h3 className="font-bold text-lg bg-yellow-400 text-black px-2 py-1">
+                      <h3 className="font-bold text-lg bg-white text-black px-2 py-1">
                         Semana {weekNum}
                       </h3>
                       <div className="border rounded-lg overflow-hidden">
                         <Table>
-                          <TableHeader className="bg-yellow-400">
+                          <TableHeader className="bg-white">
                             <TableRow>
                               <TableHead className="font-bold text-black">
                                 Dia
