@@ -10,6 +10,7 @@ import { AuthProvider, useAuth } from "@/lib/auth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
+import Dashboard from "@/pages/Dashboard";
 import Athletes from "@/pages/Athletes";
 import Tests from "@/pages/Tests";
 import Exercises from "@/pages/Exercises";
@@ -52,7 +53,7 @@ function MainLayout() {
           </header>
           <main className="flex-1 overflow-auto">
             <Switch>
-              <Route path="/" component={Athletes} />
+              <Route path="/" component={Dashboard} />
               <Route path="/athletes" component={Athletes} />
               <Route path="/tests" component={Tests} />
               <Route path="/exercises" component={Exercises} />
@@ -76,16 +77,57 @@ function Router() {
     <Switch>
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
+      <Route path="/athletes">
+        <ProtectedRoute>
+          <MainLayout />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/tests">
+        <ProtectedRoute>
+          <MainLayout />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/exercises">
+        <ProtectedRoute>
+          <MainLayout />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/movement-types">
+        <ProtectedRoute>
+          <MainLayout />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/running">
+        <ProtectedRoute>
+          <MainLayout />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/periodization">
+        <ProtectedRoute>
+          <MainLayout />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/strength">
+        <ProtectedRoute>
+          <MainLayout />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/assessment">
+        <ProtectedRoute>
+          <MainLayout />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/anamnese">
+        <ProtectedRoute>
+          <MainLayout />
+        </ProtectedRoute>
+      </Route>
       <Route path="/">
         <ProtectedRoute>
           <MainLayout />
         </ProtectedRoute>
       </Route>
-      <Route path="/:rest*">
-        <ProtectedRoute>
-          <MainLayout />
-        </ProtectedRoute>
-      </Route>
+      <Route component={NotFound} />
     </Switch>
   );
 }

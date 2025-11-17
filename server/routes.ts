@@ -46,7 +46,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("[REGISTER] User created:", user.id, user.username);
 
       req.session.userId = user.id;
-      res.json({ id: user.id, username: user.username });
+
+      // Salvar a sessão explicitamente
+      req.session.save((err) => {
+        if (err) {
+          console.error("[REGISTER] Error saving session:", err);
+          return next(err);
+        }
+        console.log("[REGISTER] Session saved successfully for user:", user.id);
+        res.json({ id: user.id, username: user.username });
+      });
     } catch (error) {
       console.error("[REGISTER] Error:", error);
       next(error);
@@ -68,7 +77,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       req.session.userId = user.id;
-      res.json({ id: user.id, username: user.username });
+
+      // Salvar a sessão explicitamente
+      req.session.save((err) => {
+        if (err) {
+          console.error("[LOGIN] Error saving session:", err);
+          return next(err);
+        }
+        console.log("[LOGIN] Session saved successfully for user:", user.id);
+        res.json({ id: user.id, username: user.username });
+      });
     } catch (error) {
       next(error);
     }
@@ -85,15 +103,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/auth/me", async (req, res, next) => {
     try {
+      console.log("[AUTH/ME] Checking session, userId:", req.session.userId);
+
       if (!req.session.userId) {
         return res.status(401).json({ error: "Não autenticado" });
       }
 
       const user = await storage.getUser(req.session.userId);
       if (!user) {
+        console.log("[AUTH/ME] User not found for id:", req.session.userId);
         return res.status(404).json({ error: "Usuário não encontrado" });
       }
 
+      console.log("[AUTH/ME] User authenticated:", user.username);
       res.json({ id: user.id, username: user.username });
     } catch (error) {
       next(error);

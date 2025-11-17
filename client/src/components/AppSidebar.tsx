@@ -32,6 +32,7 @@ import {
   Weight,
   Layers,
   FileText,
+  Home,
 } from "lucide-react";
 
 const cadastroItems = [
@@ -96,6 +97,19 @@ export function AppSidebar() {
           <SidebarGroupLabel>Menu Principal</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={location === "/"}
+                  data-testid="sidebar-item-dashboard"
+                >
+                  <Link href="/">
+                    <Home />
+                    <span>Dashboard</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
               <Collapsible
                 open={isCadastroOpen}
                 onOpenChange={setIsCadastroOpen}
