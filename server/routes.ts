@@ -91,6 +91,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log("[LOGIN] Session saved successfully for user:", user.id);
         console.log("[LOGIN] Session ID:", req.sessionID);
         console.log("[LOGIN] Session data:", req.session);
+        console.log("[LOGIN] Set-Cookie header:", res.getHeader("Set-Cookie"));
         res.json({ id: user.id, username: user.username });
       });
     } catch (error) {

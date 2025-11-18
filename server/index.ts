@@ -27,7 +27,8 @@ app.use(
       maxAge: 7 * 24 * 60 * 60 * 1000,
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      // Não definir domain para permitir que funcione no domínio atual
     },
   })
 );
@@ -47,6 +48,10 @@ app.use((req, res, next) => {
     console.log(`[COOKIE DEBUG] ${req.method} ${req.path}`);
     console.log("[COOKIE DEBUG] Cookies:", req.headers.cookie);
     console.log("[COOKIE DEBUG] Session ID:", req.sessionID);
+    console.log(
+      "[COOKIE DEBUG] User-Agent:",
+      req.headers["user-agent"]?.substring(0, 50)
+    );
   }
   next();
 });
