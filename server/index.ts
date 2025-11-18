@@ -41,6 +41,16 @@ app.use(
 );
 app.use(express.urlencoded({ extended: false }));
 
+// Debug middleware to log cookies
+app.use((req, res, next) => {
+  if (req.path.startsWith("/api")) {
+    console.log(`[COOKIE DEBUG] ${req.method} ${req.path}`);
+    console.log("[COOKIE DEBUG] Cookies:", req.headers.cookie);
+    console.log("[COOKIE DEBUG] Session ID:", req.sessionID);
+  }
+  next();
+});
+
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;

@@ -64,18 +64,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/auth/login", async (req, res, next) => {
     try {
+      console.log("[LOGIN] Attempting login for:", req.body.username);
       const { username, password } = insertUserSchema.parse(req.body);
 
       const user = await storage.getUserByUsername(username);
       if (!user) {
+        console.log("[LOGIN] User not found:", username);
         return res.status(401).json({ error: "Credenciais inválidas" });
       }
 
       const valid = await verifyPassword(password, user.password);
       if (!valid) {
+        console.log("[LOGIN] Invalid password for user:", username);
         return res.status(401).json({ error: "Credenciais inválidas" });
       }
 
+      console.log("[LOGIN] Password valid, setting session for user:", user.id);
       req.session.userId = user.id;
 
       // Salvar a sessão explicitamente
@@ -85,9 +89,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return next(err);
         }
         console.log("[LOGIN] Session saved successfully for user:", user.id);
+        console.log("[LOGIN] Session ID:", req.sessionID);
+        console.log("[LOGIN] Session data:", req.session);
         res.json({ id: user.id, username: user.username });
       });
     } catch (error) {
+      console.error("[LOGIN] Error during login:", error);
       next(error);
     }
   });
@@ -103,6 +110,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/auth/me", async (req, res, next) => {
     try {
+      console.log("[AUTH/ME] Session ID:", req.sessionID);
+      console.log("[AUTH/ME] Session data:", req.session);
       console.log("[AUTH/ME] Checking session, userId:", req.session.userId);
 
       if (!req.session.userId) {
