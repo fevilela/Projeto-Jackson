@@ -7,6 +7,10 @@ import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
 
+// Trust proxy - necessário para Render e outros serviços de hospedagem
+// Isso permite que o Express detecte corretamente HTTPS por trás de um proxy
+app.set("trust proxy", 1);
+
 declare module "http" {
   interface IncomingMessage {
     rawBody: unknown;
@@ -27,7 +31,7 @@ app.use(
       maxAge: 7 * 24 * 60 * 60 * 1000,
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      sameSite: "lax", // Mudei de volta para "lax" que funciona melhor
       // Não definir domain para permitir que funcione no domínio atual
     },
   })
