@@ -165,6 +165,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/athletes/:id/report", requireAuth, async (req, res, next) => {
+    try {
+      const athleteId = req.params.id;
+      const userId = req.session.userId!;
+
+      const athlete = await storage.getAthletesByUserId(userId);
+      const athleteData = athlete.find((a) => a.id === athleteId);
+
+      if (!athleteData) {
+        return res.status(404).json({ error: "Atleta não encontrado" });
+      }
+
+      const [
+        tests,
+        anamnesis,
+        runningWorkouts,
+        runningPlans,
+        periodizationPlans,
+        periodizationNote,
+        strengthExercises,
+        functionalAssessments,
+      ] = await Promise.all([
+        storage.getTestsByAthleteId(athleteId, userId),
+        storage.getAnamnesisByAthleteId(athleteId, userId),
+        storage.getRunningWorkoutsByAthleteId(athleteId, userId),
+        storage.getRunningPlansByAthleteId(athleteId, userId),
+        storage.getPeriodizationPlansByAthleteId(athleteId, userId),
+        storage.getPeriodizationNoteByAthleteId(athleteId, userId),
+        storage.getStrengthExercisesByAthleteId(athleteId, userId),
+        storage.getFunctionalAssessmentsByAthleteId(athleteId, userId),
+      ]);
+
+      res.json({
+        athlete: athleteData,
+        tests,
+        anamnesis,
+        runningWorkouts,
+        runningPlans,
+        periodizationPlans,
+        periodizationNote,
+        strengthExercises,
+        functionalAssessments,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // Test routes
   app.get("/api/tests", requireAuth, async (req, res, next) => {
     try {
