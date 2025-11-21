@@ -7,8 +7,16 @@ const COLORS = {
   dark: [18, 18, 18] as [number, number, number],
   mediumDark: [25, 25, 25] as [number, number, number],
   gray: [46, 46, 46] as [number, number, number],
-  lightGray: [179, 179, 179] as [number, number, number],
+  lightGray: [120, 120, 120] as [number, number, number],
   white: [250, 250, 250] as [number, number, number],
+  accent: [180, 180, 180] as [number, number, number],
+};
+
+const SPACING = {
+  small: 4,
+  medium: 8,
+  large: 12,
+  xlarge: 16,
 };
 
 async function loadLogoAsBase64(): Promise<string> {
@@ -32,21 +40,21 @@ function addPageDecoration(doc: jsPDF, pageNumber: number) {
   const pageHeight = doc.internal.pageSize.getHeight();
 
   doc.setDrawColor(...COLORS.primary);
-  doc.setLineWidth(0.5);
-  doc.line(14, 10, pageWidth - 14, 10);
+  doc.setLineWidth(0.8);
+  doc.line(20, 12, pageWidth - 20, 12);
 
-  doc.setDrawColor(...COLORS.gray);
-  doc.setLineWidth(0.3);
-  doc.line(14, pageHeight - 10, pageWidth - 14, pageHeight - 10);
+  doc.setDrawColor(...COLORS.accent);
+  doc.setLineWidth(0.2);
+  doc.line(20, pageHeight - 15, pageWidth - 20, pageHeight - 15);
 
   doc.setFillColor(...COLORS.primary);
-  doc.rect(14, 8, 3, 4, "F");
-  doc.rect(pageWidth - 17, 8, 3, 4, "F");
+  doc.rect(20, 10, 4, 4, "F");
+  doc.rect(pageWidth - 24, 10, 4, 4, "F");
 
-  doc.setFontSize(8);
+  doc.setFontSize(9);
   doc.setTextColor(...COLORS.lightGray);
-  doc.setFont("helvetica", "normal");
-  doc.text(`Página ${pageNumber}`, pageWidth / 2, pageHeight - 6, {
+  doc.setFont("times", "italic");
+  doc.text(`Página ${pageNumber}`, pageWidth / 2, pageHeight - 10, {
     align: "center",
   });
 }
@@ -136,27 +144,27 @@ function addSection(
   margin: number,
   pageNumber: { current: number }
 ): number {
-  if (yPosition > 250) {
+  if (yPosition > 240) {
     doc.addPage();
     pageNumber.current++;
     addPageDecoration(doc, pageNumber.current);
-    yPosition = 20;
+    yPosition = 25;
   }
 
   doc.setFillColor(...COLORS.primary);
-  doc.rect(margin, yPosition - 3, 4, 6, "F");
+  doc.rect(margin, yPosition - 4, 5, 8, "F");
 
-  doc.setFontSize(14);
+  doc.setFontSize(16);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...COLORS.dark);
-  doc.text(title, margin + 7, yPosition);
+  doc.text(title.toUpperCase(), margin + 9, yPosition);
 
   const pageWidth = doc.internal.pageSize.getWidth();
   doc.setDrawColor(...COLORS.primary);
-  doc.setLineWidth(0.5);
-  doc.line(margin + 7, yPosition + 2, pageWidth - margin, yPosition + 2);
+  doc.setLineWidth(0.6);
+  doc.line(margin + 9, yPosition + 2, pageWidth - margin, yPosition + 2);
 
-  yPosition += 10;
+  yPosition += SPACING.large;
 
   return yPosition;
 }
@@ -172,25 +180,26 @@ function addTextField(
 ): number {
   if (!value) return yPosition;
 
-  if (yPosition > 270) {
+  if (yPosition > 260) {
     doc.addPage();
     pageNumber.current++;
     addPageDecoration(doc, pageNumber.current);
-    yPosition = 20;
+    yPosition = 25;
   }
 
-  doc.setFontSize(10);
+  doc.setFontSize(11);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...COLORS.dark);
   const labelLines = doc.splitTextToSize(`${label}:`, pageWidth - 2 * margin);
   doc.text(labelLines, margin, yPosition);
-  yPosition += 5;
+  yPosition += SPACING.medium;
 
-  doc.setFont("helvetica", "normal");
+  doc.setFont("times", "normal");
+  doc.setFontSize(10);
   doc.setTextColor(...COLORS.gray);
   const valueLines = doc.splitTextToSize(value, pageWidth - 2 * margin);
   doc.text(valueLines, margin, yPosition);
-  yPosition += valueLines.length * 5 + 3;
+  yPosition += valueLines.length * 5 + SPACING.medium;
 
   return yPosition;
 }
@@ -208,36 +217,36 @@ export async function generateAthleteReport(athleteId: string) {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 14;
+    const margin = 20;
     const pageNumber = { current: 1 };
 
     doc.setFillColor(...COLORS.dark);
-    doc.rect(0, 0, pageWidth, 45, "F");
+    doc.rect(0, 0, pageWidth, 48, "F");
 
     doc.setDrawColor(...COLORS.primary);
-    doc.setLineWidth(0.8);
-    doc.line(margin, 10, pageWidth - margin, 10);
+    doc.setLineWidth(1);
+    doc.line(margin, 12, pageWidth - margin, 12);
 
     if (logoBase64) {
       try {
-        doc.addImage(logoBase64, "JPEG", (pageWidth - 100) / 2, 14, 100, 25);
+        doc.addImage(logoBase64, "JPEG", (pageWidth - 90) / 2, 16, 90, 23);
       } catch (error) {
         console.error("Error adding logo to PDF:", error);
       }
     }
 
-    let yPosition = 54;
-    doc.setFontSize(24);
+    let yPosition = 58;
+    doc.setFontSize(22);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(...COLORS.dark);
     doc.text("RELATÓRIO COMPLETO DO ATLETA", pageWidth / 2, yPosition, {
       align: "center",
     });
 
-    yPosition += 8;
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(...COLORS.gray);
+    yPosition += SPACING.medium;
+    doc.setFontSize(9);
+    doc.setFont("times", "italic");
+    doc.setTextColor(...COLORS.lightGray);
     doc.text(
       `Gerado em: ${format(new Date(), "dd/MM/yyyy 'às' HH:mm")}`,
       pageWidth / 2,
@@ -245,30 +254,34 @@ export async function generateAthleteReport(athleteId: string) {
       { align: "center" }
     );
 
-    yPosition += 10;
+    yPosition += SPACING.large;
     doc.setDrawColor(...COLORS.primary);
-    doc.setLineWidth(1.5);
-    doc.rect(margin, yPosition, pageWidth - 2 * margin, 22, "S");
+    doc.setFillColor(255, 255, 255);
+    doc.setLineWidth(2);
+    doc.roundedRect(margin, yPosition, pageWidth - 2 * margin, 26, 2, 2, "S");
 
-    yPosition += 9;
-    doc.setFontSize(15);
+    yPosition += SPACING.medium + 2;
+    doc.setFontSize(17);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(...COLORS.dark);
     doc.text(`${data.athlete.name}`, pageWidth / 2, yPosition, {
       align: "center",
     });
 
-    yPosition += 7;
+    yPosition += SPACING.medium;
     doc.setFontSize(11);
-    doc.setFont("helvetica", "normal");
+    doc.setFont("times", "normal");
+    doc.setTextColor(...COLORS.gray);
     doc.text(
-      `${data.athlete.age} anos | ${data.athlete.sport}`,
+      `${data.athlete.age} anos  •  ${data.athlete.sport}`,
       pageWidth / 2,
       yPosition,
-      { align: "center" }
+      {
+        align: "center",
+      }
     );
 
-    yPosition += 15;
+    yPosition += SPACING.xlarge + 2;
     addPageDecoration(doc, pageNumber.current);
 
     if (data.anamnesis && data.anamnesis.length > 0) {
@@ -279,18 +292,19 @@ export async function generateAthleteReport(athleteId: string) {
       );
       const latestAnamnesis = sortedAnamnesis[0];
 
-      yPosition = addSection(doc, "ANAMNESE", yPosition, margin, pageNumber);
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "italic");
+      yPosition = addSection(doc, "Anamnese", yPosition, margin, pageNumber);
+      doc.setFontSize(10);
+      doc.setFont("times", "italic");
+      doc.setTextColor(...COLORS.lightGray);
       doc.text(
-        `Data: ${format(
+        `Data da avaliação: ${format(
           new Date(latestAnamnesis.anamnesisDate),
           "dd/MM/yyyy"
         )}`,
         margin,
         yPosition
       );
-      yPosition += 8;
+      yPosition += SPACING.medium + 2;
 
       yPosition = addTextField(
         doc,
@@ -412,10 +426,10 @@ export async function generateAthleteReport(athleteId: string) {
     }
 
     if (data.tests && data.tests.length > 0) {
-      yPosition += 5;
+      yPosition += SPACING.medium;
       yPosition = addSection(
         doc,
-        "RESULTADOS DE TESTES (CMJ E SJ)",
+        "Resultados de Testes (CMJ e SJ)",
         yPosition,
         margin,
         pageNumber
@@ -435,18 +449,43 @@ export async function generateAthleteReport(athleteId: string) {
 
       autoTable(doc, {
         startY: yPosition,
-        head: [["Data", "CMJ", "SJ", "Observações"]],
+        head: [["Data", "CMJ (cm)", "SJ (cm)", "Observações"]],
         body: testsData,
-        theme: "grid",
-        headStyles: { fillColor: [66, 66, 66], fontSize: 9, fontStyle: "bold" },
-        bodyStyles: { fontSize: 8 },
+        theme: "striped",
+        headStyles: {
+          fillColor: [46, 46, 46],
+          fontSize: 10,
+          fontStyle: "bold",
+          font: "helvetica",
+          textColor: [255, 255, 255],
+          halign: "center",
+        },
+        bodyStyles: {
+          fontSize: 10,
+          font: "times",
+          cellPadding: 4,
+        },
         columnStyles: {
-          3: { cellWidth: 60 },
+          0: { halign: "center", font: "times" },
+          1: {
+            font: "courier",
+            fontStyle: "bold",
+            halign: "center",
+            textColor: [46, 46, 46],
+          },
+          2: {
+            font: "courier",
+            fontStyle: "bold",
+            halign: "center",
+            textColor: [46, 46, 46],
+          },
+          3: { cellWidth: 65 },
         },
         margin: { left: margin, right: margin },
+        alternateRowStyles: { fillColor: [248, 248, 248] },
       });
 
-      yPosition = (doc as any).lastAutoTable.finalY + 10;
+      yPosition = (doc as any).lastAutoTable.finalY + SPACING.large;
 
       if (data.tests.length > 1) {
         const sortedTests = [...data.tests].sort(
@@ -470,38 +509,58 @@ export async function generateAthleteReport(athleteId: string) {
             ? (((lastSj - firstSj) / firstSj) * 100).toFixed(1)
             : "N/A";
 
-        if (yPosition > 250) {
+        if (yPosition > 240) {
           doc.addPage();
-          yPosition = 20;
+          pageNumber.current++;
+          addPageDecoration(doc, pageNumber.current);
+          yPosition = 25;
         }
 
-        doc.setFontSize(12);
-        doc.setFont("helvetica", "bold");
-        doc.text("EVOLUÇÃO DE PERFORMANCE", margin, yPosition);
-        yPosition += 8;
+        doc.setFillColor(245, 245, 245);
+        doc.rect(margin, yPosition - 2, pageWidth - 2 * margin, 28, "F");
 
-        doc.setFontSize(10);
-        doc.setFont("helvetica", "normal");
+        doc.setFontSize(13);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(...COLORS.dark);
+        doc.text("Evolução de Performance", margin + 3, yPosition + 4);
+        yPosition += SPACING.large;
+
+        doc.setFontSize(11);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(...COLORS.gray);
+        doc.text("CMJ:", margin + 3, yPosition);
+        doc.setFont("courier", "bold");
+        doc.setTextColor(...COLORS.dark);
         const cmjText =
           cmjImprovement !== "N/A"
-            ? `CMJ: ${firstTest.cmj} cm → ${lastTest.cmj} cm (${cmjImprovement}%)`
-            : `CMJ: ${firstTest.cmj} cm → ${lastTest.cmj} cm`;
+            ? `${firstTest.cmj} cm → ${lastTest.cmj} cm (${
+                parseFloat(cmjImprovement) >= 0 ? "+" : ""
+              }${cmjImprovement}%)`
+            : `${firstTest.cmj} cm → ${lastTest.cmj} cm`;
+        doc.text(cmjText, margin + 20, yPosition);
+        yPosition += SPACING.medium;
+
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(...COLORS.gray);
+        doc.text("SJ:", margin + 3, yPosition);
+        doc.setFont("courier", "bold");
+        doc.setTextColor(...COLORS.dark);
         const sjText =
           sjImprovement !== "N/A"
-            ? `SJ: ${firstTest.sj} cm → ${lastTest.sj} cm (${sjImprovement}%)`
-            : `SJ: ${firstTest.sj} cm → ${lastTest.sj} cm`;
-        doc.text(cmjText, margin, yPosition);
-        yPosition += 6;
-        doc.text(sjText, margin, yPosition);
-        yPosition += 6;
+            ? `${firstTest.sj} cm → ${lastTest.sj} cm (${
+                parseFloat(sjImprovement) >= 0 ? "+" : ""
+              }${sjImprovement}%)`
+            : `${firstTest.sj} cm → ${lastTest.sj} cm`;
+        doc.text(sjText, margin + 20, yPosition);
+        yPosition += SPACING.medium;
       }
     }
 
     if (data.functionalAssessments && data.functionalAssessments.length > 0) {
-      yPosition += 5;
+      yPosition += SPACING.medium;
       yPosition = addSection(
         doc,
-        "AVALIAÇÕES FUNCIONAIS",
+        "Avaliações Funcionais",
         yPosition,
         margin,
         pageNumber
@@ -514,13 +573,16 @@ export async function generateAthleteReport(athleteId: string) {
       );
 
       sortedAssessments.forEach((assessment, index) => {
-        if (index > 0 && yPosition > 200) {
+        if (index > 0 && yPosition > 220) {
           doc.addPage();
-          yPosition = 20;
+          pageNumber.current++;
+          addPageDecoration(doc, pageNumber.current);
+          yPosition = 25;
         }
 
-        doc.setFontSize(11);
+        doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
+        doc.setTextColor(...COLORS.dark);
         doc.text(
           `Avaliação de ${format(
             new Date(assessment.assessmentDate),
@@ -529,7 +591,7 @@ export async function generateAthleteReport(athleteId: string) {
           margin,
           yPosition
         );
-        yPosition += 7;
+        yPosition += SPACING.medium;
 
         const assessmentData: string[][] = [];
         if (assessment.ankMobility)
@@ -574,13 +636,19 @@ export async function generateAthleteReport(athleteId: string) {
             startY: yPosition,
             body: assessmentData,
             theme: "striped",
-            bodyStyles: { fontSize: 9 },
+            bodyStyles: {
+              fontSize: 10,
+              font: "times",
+              cellPadding: 3,
+            },
             columnStyles: {
-              0: { fontStyle: "bold", cellWidth: 60 },
+              0: { fontStyle: "bold", cellWidth: 70, font: "helvetica" },
+              1: { font: "times" },
             },
             margin: { left: margin, right: margin },
+            alternateRowStyles: { fillColor: [248, 248, 248] },
           });
-          yPosition = (doc as any).lastAutoTable.finalY + 5;
+          yPosition = (doc as any).lastAutoTable.finalY + SPACING.medium;
         }
 
         if (assessment.generalObservations) {
@@ -600,10 +668,10 @@ export async function generateAthleteReport(athleteId: string) {
     }
 
     if (data.runningWorkouts && data.runningWorkouts.length > 0) {
-      yPosition += 5;
+      yPosition += SPACING.medium;
       yPosition = addSection(
         doc,
-        "TREINOS DE CORRIDA",
+        "Treinos de Corrida",
         yPosition,
         margin,
         pageNumber
@@ -624,36 +692,54 @@ export async function generateAthleteReport(athleteId: string) {
         startY: yPosition,
         head: [["Semana", "Dia", "Data Início", "Treino", "Dist.", "Obs."]],
         body: workoutsData,
-        theme: "grid",
-        headStyles: { fillColor: [66, 66, 66], fontSize: 8, fontStyle: "bold" },
-        bodyStyles: { fontSize: 7 },
+        theme: "striped",
+        headStyles: {
+          fillColor: [46, 46, 46],
+          fontSize: 9,
+          fontStyle: "bold",
+          font: "helvetica",
+          textColor: [255, 255, 255],
+          halign: "center",
+        },
+        bodyStyles: {
+          fontSize: 9,
+          font: "times",
+          cellPadding: 3,
+        },
         columnStyles: {
-          3: { cellWidth: 40 },
+          0: { halign: "center", font: "helvetica", fontStyle: "bold" },
+          1: { halign: "center" },
+          2: { halign: "center" },
+          3: { cellWidth: 45 },
         },
         margin: { left: margin, right: margin },
+        alternateRowStyles: { fillColor: [248, 248, 248] },
       });
 
-      yPosition = (doc as any).lastAutoTable.finalY + 10;
+      yPosition = (doc as any).lastAutoTable.finalY + SPACING.large;
     }
 
     if (data.runningPlans && data.runningPlans.length > 0) {
-      yPosition += 5;
+      yPosition += SPACING.medium;
       yPosition = addSection(
         doc,
-        "PLANOS DE CORRIDA (CALCULADORA VO2)",
+        "Planos de Corrida (Calculadora VO2)",
         yPosition,
         margin,
         pageNumber
       );
 
       data.runningPlans.forEach((plan, index) => {
-        if (yPosition > 240) {
+        if (yPosition > 230) {
           doc.addPage();
-          yPosition = 20;
+          pageNumber.current++;
+          addPageDecoration(doc, pageNumber.current);
+          yPosition = 25;
         }
 
-        doc.setFontSize(11);
+        doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
+        doc.setTextColor(...COLORS.dark);
         doc.text(
           `Plano ${index + 1}${
             plan.startDate
@@ -663,7 +749,7 @@ export async function generateAthleteReport(athleteId: string) {
           margin,
           yPosition
         );
-        yPosition += 7;
+        yPosition += SPACING.medium;
 
         const planData: string[][] = [];
         if (plan.vo1) planData.push(["VO1", plan.vo1]);
@@ -676,13 +762,19 @@ export async function generateAthleteReport(athleteId: string) {
             startY: yPosition,
             body: planData,
             theme: "striped",
-            bodyStyles: { fontSize: 9 },
+            bodyStyles: {
+              fontSize: 10,
+              font: "times",
+              cellPadding: 3,
+            },
             columnStyles: {
-              0: { fontStyle: "bold", cellWidth: 40 },
+              0: { fontStyle: "bold", cellWidth: 50, font: "helvetica" },
+              1: { font: "courier", fontStyle: "bold", halign: "center" },
             },
             margin: { left: margin, right: margin },
+            alternateRowStyles: { fillColor: [248, 248, 248] },
           });
-          yPosition = (doc as any).lastAutoTable.finalY + 5;
+          yPosition = (doc as any).lastAutoTable.finalY + SPACING.medium;
         }
 
         if (plan.tfExplanation) {
@@ -702,10 +794,10 @@ export async function generateAthleteReport(athleteId: string) {
     }
 
     if (data.strengthExercises && data.strengthExercises.length > 0) {
-      yPosition += 5;
+      yPosition += SPACING.medium;
       yPosition = addSection(
         doc,
-        "EXERCÍCIOS DE FORÇA",
+        "Exercícios de Força",
         yPosition,
         margin,
         pageNumber
@@ -723,24 +815,39 @@ export async function generateAthleteReport(athleteId: string) {
         startY: yPosition,
         head: [["Bloco", "Exercício", "Séries", "Reps", "Obs."]],
         body: exercisesData,
-        theme: "grid",
-        headStyles: { fillColor: [66, 66, 66], fontSize: 9, fontStyle: "bold" },
-        bodyStyles: { fontSize: 8 },
+        theme: "striped",
+        headStyles: {
+          fillColor: [46, 46, 46],
+          fontSize: 10,
+          fontStyle: "bold",
+          font: "helvetica",
+          textColor: [255, 255, 255],
+          halign: "center",
+        },
+        bodyStyles: {
+          fontSize: 10,
+          font: "times",
+          cellPadding: 3,
+        },
         columnStyles: {
-          1: { cellWidth: 60 },
-          4: { cellWidth: 40 },
+          0: { halign: "center", font: "helvetica", fontStyle: "bold" },
+          1: { cellWidth: 65 },
+          2: { halign: "center", font: "courier", fontStyle: "bold" },
+          3: { halign: "center", font: "courier", fontStyle: "bold" },
+          4: { cellWidth: 45 },
         },
         margin: { left: margin, right: margin },
+        alternateRowStyles: { fillColor: [248, 248, 248] },
       });
 
-      yPosition = (doc as any).lastAutoTable.finalY + 10;
+      yPosition = (doc as any).lastAutoTable.finalY + SPACING.large;
     }
 
     if (data.periodizationPlans && data.periodizationPlans.length > 0) {
-      yPosition += 5;
+      yPosition += SPACING.medium;
       yPosition = addSection(
         doc,
-        "PERIODIZAÇÃO",
+        "Periodização",
         yPosition,
         margin,
         pageNumber
@@ -756,23 +863,38 @@ export async function generateAthleteReport(athleteId: string) {
 
       autoTable(doc, {
         startY: yPosition,
-        head: [["Período", "Foco", "Estrutura", "Vol/Int", "Obs."]],
+        head: [
+          ["Período", "Foco Principal", "Estrutura Semanal", "Vol/Int", "Obs."],
+        ],
         body: periodsData,
-        theme: "grid",
-        headStyles: { fillColor: [66, 66, 66], fontSize: 9, fontStyle: "bold" },
-        bodyStyles: { fontSize: 8 },
+        theme: "striped",
+        headStyles: {
+          fillColor: [46, 46, 46],
+          fontSize: 9,
+          fontStyle: "bold",
+          font: "helvetica",
+          textColor: [255, 255, 255],
+          halign: "center",
+        },
+        bodyStyles: {
+          fontSize: 10,
+          font: "times",
+          cellPadding: 3,
+        },
         columnStyles: {
-          1: { cellWidth: 40 },
-          4: { cellWidth: 40 },
+          0: { halign: "center", font: "helvetica", fontStyle: "bold" },
+          1: { cellWidth: 50 },
+          4: { cellWidth: 45 },
         },
         margin: { left: margin, right: margin },
+        alternateRowStyles: { fillColor: [248, 248, 248] },
       });
 
-      yPosition = (doc as any).lastAutoTable.finalY + 10;
+      yPosition = (doc as any).lastAutoTable.finalY + SPACING.large;
     }
 
     if (data.periodizationNote?.generalObservations) {
-      yPosition += 5;
+      yPosition += SPACING.medium;
       yPosition = addTextField(
         doc,
         "Observações Gerais da Periodização",
