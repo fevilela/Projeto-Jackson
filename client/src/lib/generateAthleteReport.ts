@@ -2,6 +2,55 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { format } from "date-fns";
 
+const COLORS = {
+  primary: [210, 235, 56] as [number, number, number],
+  dark: [18, 18, 18] as [number, number, number],
+  mediumDark: [25, 25, 25] as [number, number, number],
+  gray: [46, 46, 46] as [number, number, number],
+  lightGray: [179, 179, 179] as [number, number, number],
+  white: [250, 250, 250] as [number, number, number],
+};
+
+async function loadLogoAsBase64(): Promise<string> {
+  try {
+    const response = await fetch("/images/logo-jackson-max.jpg");
+    const blob = await response.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch (error) {
+    console.error("Error loading logo:", error);
+    return "";
+  }
+}
+
+function addPageDecoration(doc: jsPDF, pageNumber: number) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+
+  doc.setDrawColor(...COLORS.primary);
+  doc.setLineWidth(0.5);
+  doc.line(14, 10, pageWidth - 14, 10);
+
+  doc.setDrawColor(...COLORS.gray);
+  doc.setLineWidth(0.3);
+  doc.line(14, pageHeight - 10, pageWidth - 14, pageHeight - 10);
+
+  doc.setFillColor(...COLORS.primary);
+  doc.rect(14, 8, 3, 4, "F");
+  doc.rect(pageWidth - 17, 8, 3, 4, "F");
+
+  doc.setFontSize(8);
+  doc.setTextColor(...COLORS.lightGray);
+  doc.setFont("helvetica", "normal");
+  doc.text(`Página ${pageNumber}`, pageWidth / 2, pageHeight - 6, {
+    align: "center",
+  });
+}
+
 interface AthleteReportData {
   athlete: {
     id: string;
@@ -84,17 +133,30 @@ function addSection(
   doc: jsPDF,
   title: string,
   yPosition: number,
-  margin: number
+  margin: number,
+  pageNumber: { current: number }
 ): number {
   if (yPosition > 250) {
     doc.addPage();
+    pageNumber.current++;
+    addPageDecoration(doc, pageNumber.current);
     yPosition = 20;
   }
 
+  doc.setFillColor(...COLORS.primary);
+  doc.rect(margin, yPosition - 3, 4, 6, "F");
+
   doc.setFontSize(14);
   doc.setFont("helvetica", "bold");
-  doc.text(title, margin, yPosition);
-  yPosition += 8;
+  doc.setTextColor(...COLORS.dark);
+  doc.text(title, margin + 7, yPosition);
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  doc.setDrawColor(...COLORS.primary);
+  doc.setLineWidth(0.5);
+  doc.line(margin + 7, yPosition + 2, pageWidth - margin, yPosition + 2);
+
+  yPosition += 10;
 
   return yPosition;
 }
@@ -105,22 +167,27 @@ function addTextField(
   value: string | undefined,
   yPosition: number,
   margin: number,
-  pageWidth: number
+  pageWidth: number,
+  pageNumber: { current: number }
 ): number {
   if (!value) return yPosition;
 
   if (yPosition > 270) {
     doc.addPage();
+    pageNumber.current++;
+    addPageDecoration(doc, pageNumber.current);
     yPosition = 20;
   }
 
   doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
+  doc.setTextColor(...COLORS.dark);
   const labelLines = doc.splitTextToSize(`${label}:`, pageWidth - 2 * margin);
   doc.text(labelLines, margin, yPosition);
   yPosition += 5;
 
   doc.setFont("helvetica", "normal");
+  doc.setTextColor(...COLORS.gray);
   const valueLines = doc.splitTextToSize(value, pageWidth - 2 * margin);
   doc.text(valueLines, margin, yPosition);
   yPosition += valueLines.length * 5 + 3;
@@ -136,21 +203,41 @@ export async function generateAthleteReport(athleteId: string) {
     }
 
     const data: AthleteReportData = await response.json();
+    const logoBase64 = await loadLogoAsBase64();
+
     const doc = new jsPDF();
-
-    let yPosition = 20;
     const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
     const margin = 14;
+    const pageNumber = { current: 1 };
 
-    doc.setFontSize(18);
+    doc.setFillColor(...COLORS.dark);
+    doc.rect(0, 0, pageWidth, 45, "F");
+
+    doc.setDrawColor(...COLORS.primary);
+    doc.setLineWidth(0.8);
+    doc.line(margin, 10, pageWidth - margin, 10);
+
+    if (logoBase64) {
+      try {
+        doc.addImage(logoBase64, "JPEG", (pageWidth - 100) / 2, 14, 100, 25);
+      } catch (error) {
+        console.error("Error adding logo to PDF:", error);
+      }
+    }
+
+    let yPosition = 54;
+    doc.setFontSize(24);
     doc.setFont("helvetica", "bold");
+    doc.setTextColor(...COLORS.dark);
     doc.text("RELATÓRIO COMPLETO DO ATLETA", pageWidth / 2, yPosition, {
       align: "center",
     });
 
-    yPosition += 12;
+    yPosition += 8;
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
+    doc.setTextColor(...COLORS.gray);
     doc.text(
       `Gerado em: ${format(new Date(), "dd/MM/yyyy 'às' HH:mm")}`,
       pageWidth / 2,
@@ -158,20 +245,31 @@ export async function generateAthleteReport(athleteId: string) {
       { align: "center" }
     );
 
-    yPosition += 15;
-    doc.setFontSize(14);
-    doc.setFont("helvetica", "bold");
-    doc.text("DADOS DO ATLETA", margin, yPosition);
-
-    yPosition += 8;
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Nome: ${data.athlete.name}`, margin, yPosition);
-    yPosition += 6;
-    doc.text(`Idade: ${data.athlete.age} anos`, margin, yPosition);
-    yPosition += 6;
-    doc.text(`Esporte: ${data.athlete.sport}`, margin, yPosition);
     yPosition += 10;
+    doc.setDrawColor(...COLORS.primary);
+    doc.setLineWidth(1.5);
+    doc.rect(margin, yPosition, pageWidth - 2 * margin, 22, "S");
+
+    yPosition += 9;
+    doc.setFontSize(15);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...COLORS.dark);
+    doc.text(`${data.athlete.name}`, pageWidth / 2, yPosition, {
+      align: "center",
+    });
+
+    yPosition += 7;
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "normal");
+    doc.text(
+      `${data.athlete.age} anos | ${data.athlete.sport}`,
+      pageWidth / 2,
+      yPosition,
+      { align: "center" }
+    );
+
+    yPosition += 15;
+    addPageDecoration(doc, pageNumber.current);
 
     if (data.anamnesis && data.anamnesis.length > 0) {
       const sortedAnamnesis = [...data.anamnesis].sort(
@@ -181,7 +279,7 @@ export async function generateAthleteReport(athleteId: string) {
       );
       const latestAnamnesis = sortedAnamnesis[0];
 
-      yPosition = addSection(doc, "ANAMNESE", yPosition, margin);
+      yPosition = addSection(doc, "ANAMNESE", yPosition, margin, pageNumber);
       doc.setFontSize(9);
       doc.setFont("helvetica", "italic");
       doc.text(
@@ -200,7 +298,8 @@ export async function generateAthleteReport(athleteId: string) {
         latestAnamnesis.mainGoal,
         yPosition,
         margin,
-        pageWidth
+        pageWidth,
+        pageNumber
       );
       yPosition = addTextField(
         doc,
@@ -208,7 +307,8 @@ export async function generateAthleteReport(athleteId: string) {
         latestAnamnesis.currentActivityLevel,
         yPosition,
         margin,
-        pageWidth
+        pageWidth,
+        pageNumber
       );
       yPosition = addTextField(
         doc,
@@ -216,7 +316,8 @@ export async function generateAthleteReport(athleteId: string) {
         latestAnamnesis.medicalHistory,
         yPosition,
         margin,
-        pageWidth
+        pageWidth,
+        pageNumber
       );
       yPosition = addTextField(
         doc,
@@ -224,7 +325,8 @@ export async function generateAthleteReport(athleteId: string) {
         latestAnamnesis.injuries,
         yPosition,
         margin,
-        pageWidth
+        pageWidth,
+        pageNumber
       );
       yPosition = addTextField(
         doc,
@@ -232,7 +334,8 @@ export async function generateAthleteReport(athleteId: string) {
         latestAnamnesis.medications,
         yPosition,
         margin,
-        pageWidth
+        pageWidth,
+        pageNumber
       );
       yPosition = addTextField(
         doc,
@@ -240,7 +343,8 @@ export async function generateAthleteReport(athleteId: string) {
         latestAnamnesis.surgeries,
         yPosition,
         margin,
-        pageWidth
+        pageWidth,
+        pageNumber
       );
       yPosition = addTextField(
         doc,
@@ -248,7 +352,8 @@ export async function generateAthleteReport(athleteId: string) {
         latestAnamnesis.allergies,
         yPosition,
         margin,
-        pageWidth
+        pageWidth,
+        pageNumber
       );
       yPosition = addTextField(
         doc,
@@ -256,7 +361,8 @@ export async function generateAthleteReport(athleteId: string) {
         latestAnamnesis.familyHistory,
         yPosition,
         margin,
-        pageWidth
+        pageWidth,
+        pageNumber
       );
       yPosition = addTextField(
         doc,
@@ -264,7 +370,8 @@ export async function generateAthleteReport(athleteId: string) {
         latestAnamnesis.lifestyle,
         yPosition,
         margin,
-        pageWidth
+        pageWidth,
+        pageNumber
       );
       yPosition = addTextField(
         doc,
@@ -272,7 +379,8 @@ export async function generateAthleteReport(athleteId: string) {
         latestAnamnesis.sleepQuality,
         yPosition,
         margin,
-        pageWidth
+        pageWidth,
+        pageNumber
       );
       yPosition = addTextField(
         doc,
@@ -280,7 +388,8 @@ export async function generateAthleteReport(athleteId: string) {
         latestAnamnesis.nutrition,
         yPosition,
         margin,
-        pageWidth
+        pageWidth,
+        pageNumber
       );
       yPosition = addTextField(
         doc,
@@ -288,7 +397,8 @@ export async function generateAthleteReport(athleteId: string) {
         latestAnamnesis.previousSports,
         yPosition,
         margin,
-        pageWidth
+        pageWidth,
+        pageNumber
       );
       yPosition = addTextField(
         doc,
@@ -296,7 +406,8 @@ export async function generateAthleteReport(athleteId: string) {
         latestAnamnesis.additionalNotes,
         yPosition,
         margin,
-        pageWidth
+        pageWidth,
+        pageNumber
       );
     }
 
@@ -306,7 +417,8 @@ export async function generateAthleteReport(athleteId: string) {
         doc,
         "RESULTADOS DE TESTES (CMJ E SJ)",
         yPosition,
-        margin
+        margin,
+        pageNumber
       );
 
       const testsData = data.tests
@@ -387,7 +499,13 @@ export async function generateAthleteReport(athleteId: string) {
 
     if (data.functionalAssessments && data.functionalAssessments.length > 0) {
       yPosition += 5;
-      yPosition = addSection(doc, "AVALIAÇÕES FUNCIONAIS", yPosition, margin);
+      yPosition = addSection(
+        doc,
+        "AVALIAÇÕES FUNCIONAIS",
+        yPosition,
+        margin,
+        pageNumber
+      );
 
       const sortedAssessments = [...data.functionalAssessments].sort(
         (a, b) =>
@@ -472,7 +590,8 @@ export async function generateAthleteReport(athleteId: string) {
             assessment.generalObservations,
             yPosition,
             margin,
-            pageWidth
+            pageWidth,
+            pageNumber
           );
         }
 
@@ -482,7 +601,13 @@ export async function generateAthleteReport(athleteId: string) {
 
     if (data.runningWorkouts && data.runningWorkouts.length > 0) {
       yPosition += 5;
-      yPosition = addSection(doc, "TREINOS DE CORRIDA", yPosition, margin);
+      yPosition = addSection(
+        doc,
+        "TREINOS DE CORRIDA",
+        yPosition,
+        margin,
+        pageNumber
+      );
 
       const workoutsData = data.runningWorkouts.map((workout) => [
         `Semana ${workout.weekNumber}`,
@@ -517,7 +642,8 @@ export async function generateAthleteReport(athleteId: string) {
         doc,
         "PLANOS DE CORRIDA (CALCULADORA VO2)",
         yPosition,
-        margin
+        margin,
+        pageNumber
       );
 
       data.runningPlans.forEach((plan, index) => {
@@ -566,7 +692,8 @@ export async function generateAthleteReport(athleteId: string) {
             plan.tfExplanation,
             yPosition,
             margin,
-            pageWidth
+            pageWidth,
+            pageNumber
           );
         }
 
@@ -576,7 +703,13 @@ export async function generateAthleteReport(athleteId: string) {
 
     if (data.strengthExercises && data.strengthExercises.length > 0) {
       yPosition += 5;
-      yPosition = addSection(doc, "EXERCÍCIOS DE FORÇA", yPosition, margin);
+      yPosition = addSection(
+        doc,
+        "EXERCÍCIOS DE FORÇA",
+        yPosition,
+        margin,
+        pageNumber
+      );
 
       const exercisesData = data.strengthExercises.map((exercise) => [
         exercise.block,
@@ -605,7 +738,13 @@ export async function generateAthleteReport(athleteId: string) {
 
     if (data.periodizationPlans && data.periodizationPlans.length > 0) {
       yPosition += 5;
-      yPosition = addSection(doc, "PERIODIZAÇÃO", yPosition, margin);
+      yPosition = addSection(
+        doc,
+        "PERIODIZAÇÃO",
+        yPosition,
+        margin,
+        pageNumber
+      );
 
       const periodsData = data.periodizationPlans.map((plan) => [
         plan.period,
@@ -640,7 +779,8 @@ export async function generateAthleteReport(athleteId: string) {
         data.periodizationNote.generalObservations,
         yPosition,
         margin,
-        pageWidth
+        pageWidth,
+        pageNumber
       );
     }
 

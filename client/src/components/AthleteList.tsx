@@ -1,7 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Users, Eye } from "lucide-react";
+import { Users, Eye, FileDown } from "lucide-react";
+import { generateAthleteReport } from "@/lib/generateAthleteReport";
+import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
 
 interface Athlete {
   id: string;
@@ -16,6 +19,31 @@ interface AthleteListProps {
 }
 
 export function AthleteList({ athletes, onSelectAthlete }: AthleteListProps) {
+  const { toast } = useToast();
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  const handleDownloadReport = async (
+    athleteId: string,
+    athleteName: string
+  ) => {
+    try {
+      setDownloadingId(athleteId);
+      await generateAthleteReport(athleteId);
+      toast({
+        title: "Sucesso!",
+        description: `Relatório de ${athleteName} baixado com sucesso.`,
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Erro ao gerar relatório. Tente novamente.",
+      });
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -49,17 +77,32 @@ export function AthleteList({ athletes, onSelectAthlete }: AthleteListProps) {
                     </Badge>
                   </div>
                 </div>
-                {onSelectAthlete && (
+                <div className="flex gap-2">
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => onSelectAthlete(athlete.id)}
-                    data-testid={`button-view-athlete-${athlete.id}`}
+                    onClick={() =>
+                      handleDownloadReport(athlete.id, athlete.name)
+                    }
+                    disabled={downloadingId === athlete.id}
+                    data-testid={`button-download-report-${athlete.id}`}
+                    title="Baixar relatório completo em PDF"
                   >
-                    <Eye className="h-4 w-4 mr-1" />
-                    Ver
+                    <FileDown className="h-4 w-4 mr-1" />
+                    {downloadingId === athlete.id ? "Gerando..." : "PDF"}
                   </Button>
-                )}
+                  {onSelectAthlete && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onSelectAthlete(athlete.id)}
+                      data-testid={`button-view-athlete-${athlete.id}`}
+                    >
+                      <Eye className="h-4 w-4 mr-1" />
+                      Ver
+                    </Button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
