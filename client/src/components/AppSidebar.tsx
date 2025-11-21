@@ -33,6 +33,7 @@ import {
   Layers,
   FileText,
   Home,
+  DollarSign,
 } from "lucide-react";
 
 const cadastroItems = [
@@ -83,6 +84,11 @@ const otherMenuItems = [
     title: "Avaliação Funcional",
     url: "/assessment",
     icon: Stethoscope,
+  },
+  {
+    title: "Financeiro",
+    url: "/financial",
+    icon: DollarSign,
   },
 ];
 

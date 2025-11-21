@@ -17,6 +17,7 @@ import {
   insertMovementFieldSchema,
   insertAnamnesisSchema,
   updateAnamnesisSchema,
+  insertFinancialTransactionSchema,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -797,6 +798,125 @@ export async function registerRoutes(app: Express): Promise<Server> {
       next(error);
     }
   });
+
+  // Financial Transaction routes
+  app.get(
+    "/api/financial-transactions",
+    requireAuth,
+    async (req, res, next) => {
+      try {
+        const transactions = await storage.getFinancialTransactionsByUserId(
+          req.session.userId!
+        );
+        res.json(transactions);
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  app.get(
+    "/api/financial-transactions/:id",
+    requireAuth,
+    async (req, res, next) => {
+      try {
+        const transaction = await storage.getFinancialTransaction(
+          req.params.id,
+          req.session.userId!
+        );
+        if (!transaction) {
+          return res.status(404).json({ error: "Transação não encontrada" });
+        }
+        res.json(transaction);
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  app.post(
+    "/api/financial-transactions",
+    requireAuth,
+    async (req, res, next) => {
+      try {
+        // Remover userId do body e sempre usar da sessão
+        const { userId: _ignoredUserId, ...bodyData } = req.body;
+        const transactionData = insertFinancialTransactionSchema.parse({
+          ...bodyData,
+          userId: req.session.userId!,
+        });
+
+        if (transactionData.athleteId) {
+          const athlete = await storage.getAthlete(transactionData.athleteId);
+          if (!athlete || athlete.userId !== req.session.userId) {
+            return res
+              .status(403)
+              .json({ error: "Atleta não encontrado ou não autorizado" });
+          }
+        }
+
+        const transaction = await storage.createFinancialTransaction(
+          transactionData
+        );
+        res.json(transaction);
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  app.patch(
+    "/api/financial-transactions/:id",
+    requireAuth,
+    async (req, res, next) => {
+      try {
+        // Remover userId do body e sempre usar da sessão
+        const { userId: _ignoredUserId, ...bodyData } = req.body;
+        const updateData = insertFinancialTransactionSchema
+          .partial()
+          .parse(bodyData);
+
+        // Não permitir atualizar userId
+        if (updateData.userId) {
+          delete updateData.userId;
+        }
+
+        if (updateData.athleteId) {
+          const athlete = await storage.getAthlete(updateData.athleteId);
+          if (!athlete || athlete.userId !== req.session.userId) {
+            return res
+              .status(403)
+              .json({ error: "Atleta não encontrado ou não autorizado" });
+          }
+        }
+
+        const transaction = await storage.updateFinancialTransaction(
+          req.params.id,
+          req.session.userId!,
+          updateData
+        );
+        res.json(transaction);
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  app.delete(
+    "/api/financial-transactions/:id",
+    requireAuth,
+    async (req, res, next) => {
+      try {
+        await storage.deleteFinancialTransaction(
+          req.params.id,
+          req.session.userId!
+        );
+        res.json({ message: "Transação excluída com sucesso" });
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
 
   const httpServer = createServer(app);
 

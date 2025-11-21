@@ -15,6 +15,7 @@ import {
   movementFields,
   functionalAssessmentValues,
   anamnesis,
+  financialTransactions,
   type User,
   type InsertUser,
   type Athlete,
@@ -43,6 +44,8 @@ import {
   type InsertFunctionalAssessmentValue,
   type Anamnesis,
   type InsertAnamnesis,
+  type FinancialTransaction,
+  type InsertFinancialTransaction,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -171,6 +174,24 @@ export interface IStorage {
     anamnesis: Partial<InsertAnamnesis>
   ): Promise<Anamnesis>;
   deleteAnamnesis(id: string, userId: string): Promise<void>;
+
+  // Financial Transaction methods
+  getFinancialTransactionsByUserId(
+    userId: string
+  ): Promise<(FinancialTransaction & { athleteName?: string | null })[]>;
+  getFinancialTransaction(
+    id: string,
+    userId: string
+  ): Promise<FinancialTransaction | undefined>;
+  createFinancialTransaction(
+    transaction: InsertFinancialTransaction
+  ): Promise<FinancialTransaction>;
+  updateFinancialTransaction(
+    id: string,
+    userId: string,
+    transaction: Partial<InsertFinancialTransaction>
+  ): Promise<FinancialTransaction>;
+  deleteFinancialTransaction(id: string, userId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -738,6 +759,93 @@ export class DatabaseStorage implements IStorage {
     await db
       .delete(anamnesis)
       .where(and(eq(anamnesis.id, id), eq(anamnesis.userId, userId)));
+  }
+
+  // Financial Transaction methods
+  async getFinancialTransactionsByUserId(
+    userId: string
+  ): Promise<(FinancialTransaction & { athleteName?: string | null })[]> {
+    const result = await db
+      .select({
+        id: financialTransactions.id,
+        userId: financialTransactions.userId,
+        athleteId: financialTransactions.athleteId,
+        type: financialTransactions.type,
+        description: financialTransactions.description,
+        totalAmount: financialTransactions.totalAmount,
+        paidAmount: financialTransactions.paidAmount,
+        dueDate: financialTransactions.dueDate,
+        paymentDate: financialTransactions.paymentDate,
+        status: financialTransactions.status,
+        observations: financialTransactions.observations,
+        createdAt: financialTransactions.createdAt,
+        updatedAt: financialTransactions.updatedAt,
+        athleteName: athletes.name,
+      })
+      .from(financialTransactions)
+      .leftJoin(athletes, eq(financialTransactions.athleteId, athletes.id))
+      .where(eq(financialTransactions.userId, userId))
+      .orderBy(desc(financialTransactions.dueDate));
+    return result;
+  }
+
+  async getFinancialTransaction(
+    id: string,
+    userId: string
+  ): Promise<FinancialTransaction | undefined> {
+    const result = await db
+      .select()
+      .from(financialTransactions)
+      .where(
+        and(
+          eq(financialTransactions.id, id),
+          eq(financialTransactions.userId, userId)
+        )
+      )
+      .limit(1);
+    return result[0];
+  }
+
+  async createFinancialTransaction(
+    transaction: InsertFinancialTransaction
+  ): Promise<FinancialTransaction> {
+    const result = await db
+      .insert(financialTransactions)
+      .values(transaction)
+      .returning();
+    return result[0];
+  }
+
+  async updateFinancialTransaction(
+    id: string,
+    userId: string,
+    updateData: Partial<InsertFinancialTransaction>
+  ): Promise<FinancialTransaction> {
+    const result = await db
+      .update(financialTransactions)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(
+        and(
+          eq(financialTransactions.id, id),
+          eq(financialTransactions.userId, userId)
+        )
+      )
+      .returning();
+    if (!result[0]) {
+      throw new Error("Transação não encontrada ou não autorizada");
+    }
+    return result[0];
+  }
+
+  async deleteFinancialTransaction(id: string, userId: string): Promise<void> {
+    await db
+      .delete(financialTransactions)
+      .where(
+        and(
+          eq(financialTransactions.id, id),
+          eq(financialTransactions.userId, userId)
+        )
+      );
   }
 }
 

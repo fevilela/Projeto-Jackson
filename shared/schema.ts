@@ -405,3 +405,41 @@ export const updateAnamnesisSchema = createInsertSchema(anamnesis).omit({
 
 export type InsertAnamnesis = z.infer<typeof insertAnamnesisSchema>;
 export type Anamnesis = typeof anamnesis.$inferSelect;
+
+// Financial Transactions
+export const financialTransactions = pgTable("financial_transactions", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  athleteId: varchar("athlete_id").references(() => athletes.id, {
+    onDelete: "set null",
+  }),
+  type: text("type").notNull(), // "receita" ou "despesa"
+  description: text("description").notNull(),
+  totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
+  paidAmount: decimal("paid_amount", { precision: 10, scale: 2 })
+    .notNull()
+    .default("0"),
+  dueDate: text("due_date").notNull(),
+  paymentDate: text("payment_date"),
+  status: text("status").notNull().default("pendente"), // "pendente", "pago_parcial", "pago"
+  observations: text("observations"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertFinancialTransactionSchema = createInsertSchema(
+  financialTransactions
+).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertFinancialTransaction = z.infer<
+  typeof insertFinancialTransactionSchema
+>;
+export type FinancialTransaction = typeof financialTransactions.$inferSelect;
