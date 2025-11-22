@@ -34,6 +34,7 @@ import {
   FileText,
   Home,
   DollarSign,
+  UserCircle,
 } from "lucide-react";
 
 const cadastroItems = [
@@ -89,6 +90,11 @@ const otherMenuItems = [
     title: "Financeiro",
     url: "/financial",
     icon: DollarSign,
+  },
+  {
+    title: "Perfil",
+    url: "/profile",
+    icon: UserCircle,
   },
 ];
 

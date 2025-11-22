@@ -16,6 +16,11 @@ export const users = pgTable("users", {
     .default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
+  name: text("name"),
+  email: text("email"),
+  birthDate: text("birth_date"),
+  cref: text("cref"),
+  profilePhoto: text("profile_photo"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -24,7 +29,16 @@ export const insertUserSchema = createInsertSchema(users).pick({
   password: true,
 });
 
+export const updateProfileSchema = createInsertSchema(users).pick({
+  name: true,
+  email: true,
+  birthDate: true,
+  cref: true,
+  profilePhoto: true,
+});
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
+export type UpdateProfile = z.infer<typeof updateProfileSchema>;
 export type User = typeof users.$inferSelect;
 
 export const athletes = pgTable("athletes", {

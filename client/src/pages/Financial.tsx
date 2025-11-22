@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -12,6 +12,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   Form,
   FormControl,
@@ -47,8 +55,12 @@ import {
   TrendingUp,
   TrendingDown,
   DollarSign,
+  Search,
+  Download,
 } from "lucide-react";
 import type { FinancialTransaction, Athlete } from "@shared/schema";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 const formSchema = z.object({
   type: z.enum(["receita", "despesa"]),
@@ -67,6 +79,10 @@ type FormData = z.infer<typeof formSchema>;
 export default function Financial() {
   const { toast } = useToast();
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [searchAthlete, setSearchAthlete] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   const { data: transactions = [], isLoading: transactionsLoading } = useQuery<
     (FinancialTransaction & { athleteName?: string | null })[]
@@ -118,6 +134,7 @@ export default function Financial() {
         description: "Transação criada com sucesso",
       });
       form.reset();
+      setIsDialogOpen(false);
     },
     onError: () => {
       toast({
@@ -166,6 +183,7 @@ export default function Financial() {
       });
       setEditingId(null);
       form.reset();
+      setIsDialogOpen(false);
     },
     onError: () => {
       toast({
@@ -221,27 +239,53 @@ export default function Financial() {
       status: transaction.status as "pendente" | "pago_parcial" | "pago",
       observations: transaction.observations || "",
     });
+    setIsDialogOpen(true);
   };
 
   const handleCancelEdit = () => {
     setEditingId(null);
     form.reset();
+    setIsDialogOpen(false);
   };
 
-  const getStatusBadge = (status: string) => {
-    const variants = {
-      pendente: "destructive",
-      pago_parcial: "default",
-      pago: "default",
-    };
-    const labels = {
-      pendente: "Pendente",
-      pago_parcial: "Pago Parcial",
-      pago: "Pago",
-    };
+  const getStatusBadge = (
+    status: string,
+    dueDate: string,
+    paymentDate?: string | null
+  ) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const due = new Date(dueDate);
+    due.setHours(0, 0, 0, 0);
+
+    let variant: "default" | "destructive" | "secondary" | "outline" =
+      "default";
+    let label = "";
+    let className = "";
+
+    if (status === "pago") {
+      variant = "default";
+      label = "Em Dia";
+      className = "bg-green-500 hover:bg-green-600 text-white";
+    } else if (status === "pago_parcial") {
+      variant = "default";
+      label = "Pago Parcial";
+      className = "bg-orange-500 hover:bg-orange-600 text-white";
+    } else if (status === "pendente") {
+      if (due < today) {
+        variant = "destructive";
+        label = "Atrasada";
+        className = "bg-red-500 hover:bg-red-600 text-white";
+      } else {
+        variant = "secondary";
+        label = "Pendente";
+        className = "bg-gray-500 hover:bg-gray-600 text-white";
+      }
+    }
+
     return (
-      <Badge variant={variants[status as keyof typeof variants] as any}>
-        {labels[status as keyof typeof labels]}
+      <Badge variant={variant} className={className}>
+        {label}
       </Badge>
     );
   };
@@ -257,6 +301,134 @@ export default function Financial() {
   };
 
   const summary = calculateSummary();
+
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter((transaction) => {
+      const matchesAthlete = searchAthlete
+        ? transaction.athleteName
+            ?.toLowerCase()
+            .includes(searchAthlete.toLowerCase())
+        : true;
+
+      let matchesDateRange = true;
+      if (startDate || endDate) {
+        const transactionDate = new Date(transaction.dueDate);
+        if (startDate) {
+          const start = new Date(startDate);
+          matchesDateRange = matchesDateRange && transactionDate >= start;
+        }
+        if (endDate) {
+          const end = new Date(endDate);
+          matchesDateRange = matchesDateRange && transactionDate <= end;
+        }
+      }
+
+      return matchesAthlete && matchesDateRange;
+    });
+  }, [transactions, searchAthlete, startDate, endDate]);
+
+  const downloadReport = () => {
+    const doc = new jsPDF();
+
+    doc.setFontSize(18);
+    doc.text("Relatório Financeiro", 14, 20);
+
+    doc.setFontSize(11);
+    doc.text(
+      `Data de geração: ${format(new Date(), "dd/MM/yyyy HH:mm", {
+        locale: ptBR,
+      })}`,
+      14,
+      30
+    );
+
+    if (searchAthlete) {
+      doc.text(`Filtro de Atleta: ${searchAthlete}`, 14, 36);
+    }
+    if (startDate || endDate) {
+      const dateFilter = `Período: ${
+        startDate
+          ? format(new Date(startDate), "dd/MM/yyyy", { locale: ptBR })
+          : "Início"
+      } até ${
+        endDate
+          ? format(new Date(endDate), "dd/MM/yyyy", { locale: ptBR })
+          : "Fim"
+      }`;
+      doc.text(dateFilter, 14, searchAthlete ? 42 : 36);
+    }
+
+    const tableData = filteredTransactions.map((transaction) => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const due = new Date(transaction.dueDate);
+      due.setHours(0, 0, 0, 0);
+
+      let statusLabel = "";
+      if (transaction.status === "pago") {
+        statusLabel = "Em Dia";
+      } else if (transaction.status === "pago_parcial") {
+        statusLabel = "Pago Parcial";
+      } else if (transaction.status === "pendente") {
+        statusLabel = due < today ? "Atrasada" : "Pendente";
+      }
+
+      return [
+        transaction.type === "receita" ? "Receita" : "Despesa",
+        transaction.description,
+        transaction.athleteName || "Nenhum",
+        format(new Date(transaction.dueDate), "dd/MM/yyyy", { locale: ptBR }),
+        `R$ ${parseFloat(transaction.totalAmount).toFixed(2)}`,
+        `R$ ${parseFloat(transaction.paidAmount).toFixed(2)}`,
+        statusLabel,
+      ];
+    });
+
+    autoTable(doc, {
+      head: [
+        [
+          "Tipo",
+          "Descrição",
+          "Atleta",
+          "Vencimento",
+          "Valor Total",
+          "Valor Pago",
+          "Status",
+        ],
+      ],
+      body: tableData,
+      startY: searchAthlete || startDate || endDate ? 48 : 40,
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [66, 66, 66] },
+    });
+
+    const finalY = (doc as any).lastAutoTable.finalY || 40;
+
+    const receitas = filteredTransactions
+      .filter((t) => t.type === "receita")
+      .reduce((sum, t) => sum + parseFloat(t.paidAmount), 0);
+    const despesas = filteredTransactions
+      .filter((t) => t.type === "despesa")
+      .reduce((sum, t) => sum + parseFloat(t.paidAmount), 0);
+    const saldo = receitas - despesas;
+
+    doc.setFontSize(12);
+    doc.text(`Total de Receitas: R$ ${receitas.toFixed(2)}`, 14, finalY + 10);
+    doc.text(`Total de Despesas: R$ ${despesas.toFixed(2)}`, 14, finalY + 18);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Saldo: R$ ${saldo.toFixed(2)}`, 14, finalY + 26);
+
+    doc.save(
+      `relatorio-financeiro-${format(new Date(), "yyyy-MM-dd", {
+        locale: ptBR,
+      })}.pdf`
+    );
+
+    toast({
+      title: "Sucesso",
+      description: "Relatório baixado com sucesso",
+    });
+  };
 
   return (
     <div
@@ -323,252 +495,315 @@ export default function Financial() {
 
       <Card>
         <CardHeader>
-          <CardTitle data-testid="text-form-title">
-            {editingId ? "Editar Transação" : "Nova Transação"}
-          </CardTitle>
-          <CardDescription>
-            {editingId
-              ? "Atualize os dados da transação"
-              : "Adicione uma nova receita ou despesa"}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <FormField
-                  control={form.control}
-                  name="type"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Tipo</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger data-testid="select-type">
-                            <SelectValue placeholder="Selecione o tipo" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="receita">Receita</SelectItem>
-                          <SelectItem value="despesa">Despesa</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="athleteId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Atleta (opcional)</FormLabel>
-                      <Select
-                        onValueChange={(value) =>
-                          field.onChange(value === "none" ? "" : value)
-                        }
-                        value={field.value || "none"}
-                      >
-                        <FormControl>
-                          <SelectTrigger data-testid="select-athlete">
-                            <SelectValue placeholder="Selecione um atleta" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="none">Nenhum</SelectItem>
-                          {athletes.map((athlete) => (
-                            <SelectItem key={athlete.id} value={athlete.id}>
-                              {athlete.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Descrição</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          placeholder="Ex: Mensalidade"
-                          data-testid="input-description"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="totalAmount"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Valor Total</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          type="number"
-                          step="0.01"
-                          placeholder="0.00"
-                          data-testid="input-total-amount"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="paidAmount"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Valor Pago</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          type="number"
-                          step="0.01"
-                          placeholder="0.00"
-                          data-testid="input-paid-amount"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="dueDate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Data de Vencimento</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          type="date"
-                          data-testid="input-due-date"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="paymentDate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Data de Pagamento (opcional)</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          type="date"
-                          data-testid="input-payment-date"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="status"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Status</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger data-testid="select-status">
-                            <SelectValue placeholder="Selecione o status" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="pendente">Pendente</SelectItem>
-                          <SelectItem value="pago_parcial">
-                            Pago Parcial
-                          </SelectItem>
-                          <SelectItem value="pago">Pago</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <FormField
-                control={form.control}
-                name="observations"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Observações (opcional)</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        {...field}
-                        placeholder="Observações adicionais"
-                        data-testid="textarea-observations"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="flex gap-2">
-                <Button
-                  type="submit"
-                  disabled={
-                    createMutation.isPending || updateMutation.isPending
-                  }
-                  data-testid="button-submit"
-                >
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Transações</CardTitle>
+              <CardDescription>
+                Histórico de todas as transações
+              </CardDescription>
+            </div>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button data-testid="button-add-transaction">
                   <Plus className="mr-2 h-4 w-4" />
-                  {editingId ? "Atualizar" : "Adicionar"}
+                  Adicionar
                 </Button>
-                {editingId && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleCancelEdit}
-                    data-testid="button-cancel"
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle data-testid="text-form-title">
+                    {editingId ? "Editar Transação" : "Nova Transação"}
+                  </DialogTitle>
+                  <DialogDescription>
+                    {editingId
+                      ? "Atualize os dados da transação"
+                      : "Adicione uma nova receita ou despesa"}
+                  </DialogDescription>
+                </DialogHeader>
+                <Form {...form}>
+                  <form
+                    onSubmit={form.handleSubmit(onSubmit)}
+                    className="space-y-4"
                   >
-                    Cancelar
-                  </Button>
-                )}
-              </div>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <FormField
+                        control={form.control}
+                        name="type"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Tipo</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              value={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger data-testid="select-type">
+                                  <SelectValue placeholder="Selecione o tipo" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="receita">Receita</SelectItem>
+                                <SelectItem value="despesa">Despesa</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Transações</CardTitle>
-          <CardDescription>Histórico de todas as transações</CardDescription>
+                      <FormField
+                        control={form.control}
+                        name="athleteId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Atleta (opcional)</FormLabel>
+                            <Select
+                              onValueChange={(value) =>
+                                field.onChange(value === "none" ? "" : value)
+                              }
+                              value={field.value || "none"}
+                            >
+                              <FormControl>
+                                <SelectTrigger data-testid="select-athlete">
+                                  <SelectValue placeholder="Selecione um atleta" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="none">Nenhum</SelectItem>
+                                {athletes.map((athlete) => (
+                                  <SelectItem
+                                    key={athlete.id}
+                                    value={athlete.id}
+                                  >
+                                    {athlete.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="description"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Descrição</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                placeholder="Ex: Mensalidade"
+                                data-testid="input-description"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="totalAmount"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Valor Total</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                type="number"
+                                step="0.01"
+                                placeholder="0.00"
+                                data-testid="input-total-amount"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="paidAmount"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Valor Pago</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                type="number"
+                                step="0.01"
+                                placeholder="0.00"
+                                data-testid="input-paid-amount"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="dueDate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Data de Vencimento</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                type="date"
+                                data-testid="input-due-date"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="paymentDate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Data de Pagamento (opcional)</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                type="date"
+                                data-testid="input-payment-date"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="status"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Status</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              value={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger data-testid="select-status">
+                                  <SelectValue placeholder="Selecione o status" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="pendente">
+                                  Pendente
+                                </SelectItem>
+                                <SelectItem value="pago_parcial">
+                                  Pago Parcial
+                                </SelectItem>
+                                <SelectItem value="pago">Pago</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <FormField
+                      control={form.control}
+                      name="observations"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Observações (opcional)</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              {...field}
+                              placeholder="Observações adicionais"
+                              data-testid="textarea-observations"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="flex gap-2">
+                      <Button
+                        type="submit"
+                        disabled={
+                          createMutation.isPending || updateMutation.isPending
+                        }
+                        data-testid="button-submit"
+                      >
+                        <Plus className="mr-2 h-4 w-4" />
+                        {editingId ? "Atualizar" : "Adicionar"}
+                      </Button>
+                      {editingId && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleCancelEdit}
+                          data-testid="button-cancel"
+                        >
+                          Cancelar
+                        </Button>
+                      )}
+                    </div>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+          </div>
         </CardHeader>
         <CardContent>
+          <div className="mb-4 space-y-4">
+            <div className="flex gap-4">
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar por aluno..."
+                    value={searchAthlete}
+                    onChange={(e) => setSearchAthlete(e.target.value)}
+                    className="pl-8"
+                    data-testid="input-search-athlete"
+                  />
+                </div>
+              </div>
+              <div className="flex-1 flex gap-2">
+                <div className="flex-1">
+                  <Input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    placeholder="Data inicial"
+                    data-testid="input-start-date"
+                  />
+                </div>
+                <div className="flex-1">
+                  <Input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    placeholder="Data final"
+                    data-testid="input-end-date"
+                  />
+                </div>
+              </div>
+              <Button
+                onClick={downloadReport}
+                disabled={filteredTransactions.length === 0}
+                data-testid="button-download-report"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Baixar Relatório
+              </Button>
+            </div>
+          </div>
           {transactionsLoading ? (
             <div>Carregando...</div>
-          ) : transactions.length === 0 ? (
+          ) : filteredTransactions.length === 0 ? (
             <div className="text-center text-muted-foreground py-8">
               Nenhuma transação encontrada
             </div>
@@ -587,7 +822,7 @@ export default function Financial() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {transactions.map((transaction) => (
+                {filteredTransactions.map((transaction) => (
                   <TableRow
                     key={transaction.id}
                     data-testid={`row-transaction-${transaction.id}`}
@@ -616,7 +851,13 @@ export default function Financial() {
                     <TableCell>
                       R$ {parseFloat(transaction.paidAmount).toFixed(2)}
                     </TableCell>
-                    <TableCell>{getStatusBadge(transaction.status)}</TableCell>
+                    <TableCell>
+                      {getStatusBadge(
+                        transaction.status,
+                        transaction.dueDate,
+                        transaction.paymentDate
+                      )}
+                    </TableCell>
                     <TableCell>
                       <div className="flex gap-2">
                         <Button

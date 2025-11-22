@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { hashPassword, verifyPassword, requireAuth } from "./auth";
 import {
   insertUserSchema,
+  updateProfileSchema,
   insertAthleteSchema,
   insertTestSchema,
   insertRunningWorkoutSchema,
@@ -128,6 +129,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log("[AUTH/ME] User authenticated:", user.username);
       res.json({ id: user.id, username: user.username });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Profile routes
+  app.get("/api/profile", requireAuth, async (req, res, next) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) {
+        return res.status(404).json({ error: "Usuário não encontrado" });
+      }
+      res.json({
+        id: user.id,
+        username: user.username,
+        name: user.name,
+        email: user.email,
+        birthDate: user.birthDate,
+        cref: user.cref,
+        profilePhoto: user.profilePhoto,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.patch("/api/profile", requireAuth, async (req, res, next) => {
+    try {
+      const profileData = updateProfileSchema.parse(req.body);
+      const user = await storage.updateUserProfile(
+        req.session.userId!,
+        profileData
+      );
+      res.json({
+        id: user.id,
+        username: user.username,
+        name: user.name,
+        email: user.email,
+        birthDate: user.birthDate,
+        cref: user.cref,
+        profilePhoto: user.profilePhoto,
+      });
     } catch (error) {
       next(error);
     }

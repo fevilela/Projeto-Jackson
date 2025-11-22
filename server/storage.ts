@@ -18,6 +18,7 @@ import {
   financialTransactions,
   type User,
   type InsertUser,
+  type UpdateProfile,
   type Athlete,
   type InsertAthlete,
   type Test,
@@ -53,6 +54,7 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUserProfile(id: string, profile: UpdateProfile): Promise<User>;
 
   // Athlete methods
   getAthletesByUserId(userId: string): Promise<Athlete[]>;
@@ -216,6 +218,15 @@ export class DatabaseStorage implements IStorage {
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const result = await db.insert(users).values(insertUser).returning();
+    return result[0];
+  }
+
+  async updateUserProfile(id: string, profile: UpdateProfile): Promise<User> {
+    const result = await db
+      .update(users)
+      .set(profile)
+      .where(eq(users.id, id))
+      .returning();
     return result[0];
   }
 
