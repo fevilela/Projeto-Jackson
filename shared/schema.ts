@@ -53,6 +53,8 @@ export const athletes = pgTable("athletes", {
   name: text("name").notNull(),
   age: integer("age").notNull(),
   sport: text("sport").notNull(),
+  phone: text("phone"),
+  email: text("email"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

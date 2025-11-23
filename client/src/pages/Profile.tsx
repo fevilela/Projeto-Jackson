@@ -275,6 +275,55 @@ export default function Profile() {
                 />
               </div>
 
+              <div className="pt-6 border-t space-y-4">
+                <div>
+                  <h3 className="text-lg font-semibold mb-1">
+                    Imagem do Dashboard
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Personalize a imagem principal da sua página inicial
+                  </p>
+                </div>
+                {displayDashboardImage && (
+                  <div className="rounded-lg overflow-hidden border">
+                    <img
+                      src={displayDashboardImage}
+                      alt="Preview da imagem do dashboard"
+                      className="w-full h-auto max-h-64 object-cover"
+                      data-testid="img-dashboard-preview"
+                    />
+                  </div>
+                )}
+                <div className="flex flex-col gap-2">
+                  <label htmlFor="dashboard-upload">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() =>
+                        document.getElementById("dashboard-upload")?.click()
+                      }
+                      data-testid="button-upload-dashboard"
+                    >
+                      <Upload className="mr-2 h-4 w-4" />
+                      {displayDashboardImage
+                        ? "Trocar Imagem"
+                        : "Adicionar Imagem"}
+                    </Button>
+                  </label>
+                  <input
+                    id="dashboard-upload"
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleDashboardImageChange}
+                    data-testid="input-dashboard-upload"
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    Esta imagem aparecerá no topo da sua página inicial
+                  </p>
+                </div>
+              </div>
+
               <Button
                 type="submit"
                 disabled={updateMutation.isPending}
@@ -285,53 +334,6 @@ export default function Profile() {
               </Button>
             </form>
           </Form>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Imagem do Dashboard</CardTitle>
-          <CardDescription>
-            Personalize a imagem principal da sua página inicial
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {displayDashboardImage && (
-            <div className="rounded-lg overflow-hidden border">
-              <img
-                src={displayDashboardImage}
-                alt="Preview da imagem do dashboard"
-                className="w-full h-auto max-h-64 object-cover"
-                data-testid="img-dashboard-preview"
-              />
-            </div>
-          )}
-          <div className="flex flex-col gap-2">
-            <label htmlFor="dashboard-upload">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() =>
-                  document.getElementById("dashboard-upload")?.click()
-                }
-                data-testid="button-upload-dashboard"
-              >
-                <Upload className="mr-2 h-4 w-4" />
-                {displayDashboardImage ? "Trocar Imagem" : "Adicionar Imagem"}
-              </Button>
-            </label>
-            <input
-              id="dashboard-upload"
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleDashboardImageChange}
-              data-testid="input-dashboard-upload"
-            />
-            <p className="text-sm text-muted-foreground">
-              Esta imagem aparecerá no topo da sua página inicial
-            </p>
-          </div>
         </CardContent>
       </Card>
     </div>

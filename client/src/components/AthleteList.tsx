@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Users, Eye, FileDown } from "lucide-react";
+import { Users, Eye, FileDown, Phone, Mail, Edit } from "lucide-react";
 import { generateAthleteReport } from "@/lib/generateAthleteReport";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
@@ -11,14 +11,21 @@ interface Athlete {
   name: string;
   age: string;
   sport: string;
+  phone?: string;
+  email?: string;
 }
 
 interface AthleteListProps {
   athletes: Athlete[];
   onSelectAthlete?: (athleteId: string) => void;
+  onEditAthlete?: (athlete: Athlete) => void;
 }
 
-export function AthleteList({ athletes, onSelectAthlete }: AthleteListProps) {
+export function AthleteList({
+  athletes,
+  onSelectAthlete,
+  onEditAthlete,
+}: AthleteListProps) {
   const { toast } = useToast();
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
@@ -68,7 +75,7 @@ export function AthleteList({ athletes, onSelectAthlete }: AthleteListProps) {
               >
                 <div className="flex-1">
                   <h4 className="font-semibold">{athlete.name}</h4>
-                  <div className="flex gap-2 mt-1">
+                  <div className="flex gap-2 mt-1 flex-wrap">
                     <Badge variant="outline" className="text-xs">
                       {athlete.age} anos
                     </Badge>
@@ -76,8 +83,35 @@ export function AthleteList({ athletes, onSelectAthlete }: AthleteListProps) {
                       {athlete.sport}
                     </Badge>
                   </div>
+                  {(athlete.phone || athlete.email) && (
+                    <div className="flex gap-3 mt-2 text-xs text-muted-foreground">
+                      {athlete.phone && (
+                        <span className="flex items-center gap-1">
+                          <Phone className="h-3 w-3" />
+                          {athlete.phone}
+                        </span>
+                      )}
+                      {athlete.email && (
+                        <span className="flex items-center gap-1">
+                          <Mail className="h-3 w-3" />
+                          {athlete.email}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div className="flex gap-2">
+                  {onEditAthlete && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onEditAthlete(athlete)}
+                      data-testid={`button-edit-athlete-${athlete.id}`}
+                      title="Editar atleta"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     size="sm"

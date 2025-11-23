@@ -230,19 +230,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // app.patch("/api/athletes/:id", requireAuth, async (req, res, next) => {
-  //   try {
-  //     const data = insertAthleteSchema.partial().parse(req.body);
-  //     const athlete = await storage.updateAthlete(
-  //       req.params.id,
-  //       req.session.userId!,
-  //       data
-  //     );
-  //     res.json(athlete);
-  //   } catch (error) {
-  //     next(error);
-  //   }
-  // });
+  app.patch("/api/athletes/:id", requireAuth, async (req, res, next) => {
+    try {
+      const data = insertAthleteSchema.partial().parse(req.body);
+      const athlete = await storage.updateAthlete(
+        req.params.id,
+        req.session.userId!,
+        data
+      );
+      res.json(athlete);
+    } catch (error) {
+      next(error);
+    }
+  });
 
   app.delete("/api/athletes/:id", requireAuth, async (req, res, next) => {
     try {

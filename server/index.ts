@@ -39,12 +39,13 @@ app.use(
 
 app.use(
   express.json({
+    limit: "50mb",
     verify: (req, _res, buf) => {
       req.rawBody = buf;
     },
   })
 );
-app.use(express.urlencoded({ extended: false }));
+app.use(express.urlencoded({ limit: "50mb", extended: false }));
 
 // Debug middleware to log cookies
 app.use((req, res, next) => {

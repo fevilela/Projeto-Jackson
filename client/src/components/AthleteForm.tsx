@@ -2,25 +2,47 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { UserPlus } from "lucide-react";
 
 interface AthleteFormProps {
-  onSubmit: (athlete: { name: string; age: string; sport: string }) => void;
+  onSubmit: (athlete: {
+    name: string;
+    age: string;
+    sport: string;
+    phone?: string;
+    email?: string;
+  }) => void;
 }
 
 export function AthleteForm({ onSubmit }: AthleteFormProps) {
   const [name, setName] = useState("");
   const [age, setAge] = useState("");
   const [sport, setSport] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name && age && sport) {
-      onSubmit({ name, age, sport });
+      onSubmit({
+        name,
+        age,
+        sport,
+        phone: phone || undefined,
+        email: email || undefined,
+      });
       setName("");
       setAge("");
       setSport("");
+      setPhone("");
+      setEmail("");
     }
   };
 
@@ -74,7 +96,37 @@ export function AthleteForm({ onSubmit }: AthleteFormProps) {
             </div>
           </div>
 
-          <Button type="submit" className="w-full" data-testid="button-submit-athlete">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="phone">Telefone</Label>
+              <Input
+                id="phone"
+                data-testid="input-athlete-phone"
+                type="tel"
+                placeholder="(00) 00000-0000"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                data-testid="input-athlete-email"
+                type="email"
+                placeholder="atleta@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <Button
+            type="submit"
+            className="w-full"
+            data-testid="button-submit-athlete"
+          >
             Cadastrar Atleta
           </Button>
         </form>
