@@ -55,6 +55,7 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUserProfile(id: string, profile: UpdateProfile): Promise<User>;
+  deletePeriodizationNote(id: string, userId: string): Promise<void>;
 
   // Athlete methods
   getAthletesByUserId(userId: string): Promise<Athlete[]>;
@@ -207,6 +208,17 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
+  async deletePeriodizationNote(id: string, userId: string): Promise<void> {
+    await db
+      .delete(periodizationNotes)
+      .where(
+        and(
+          eq(periodizationNotes.id, id),
+          eq(periodizationNotes.userId, userId)
+        )
+      );
+  }
+
   async getUserByUsername(username: string): Promise<User | undefined> {
     const result = await db
       .select()
@@ -326,6 +338,24 @@ export class DatabaseStorage implements IStorage {
     workout: InsertRunningWorkout
   ): Promise<RunningWorkout> {
     const result = await db.insert(runningWorkouts).values(workout).returning();
+    return result[0];
+  }
+
+  async updateRunningWorkout(
+    id: string,
+    userId: string,
+    data: Partial<InsertRunningWorkout>
+  ): Promise<RunningWorkout> {
+    const result = await db
+      .update(runningWorkouts)
+      .set(data)
+      .where(
+        and(eq(runningWorkouts.id, id), eq(runningWorkouts.userId, userId))
+      )
+      .returning();
+    if (!result || result.length === 0) {
+      throw new Error("Running workout not found or not authorized");
+    }
     return result[0];
   }
 

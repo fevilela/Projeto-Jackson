@@ -91,11 +91,6 @@ const otherMenuItems = [
     url: "/financial",
     icon: DollarSign,
   },
-  {
-    title: "Perfil",
-    url: "/profile",
-    icon: UserCircle,
-  },
 ];
 
 export function AppSidebar() {

@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/lib/auth";
 
 interface Athlete {
   id: string;
@@ -35,6 +36,7 @@ interface Test {
 }
 
 export default function Dashboard() {
+  const { user } = useAuth();
   const { data: athletes = [] } = useQuery<Athlete[]>({
     queryKey: ["/api/athletes"],
   });
@@ -97,9 +99,9 @@ export default function Dashboard() {
       <div className="flex flex-col space-y-6">
         <div className="w-full">
           <img
-            src="/images/logo-jackson-max.jpg"
-            alt="Jackson Max Treinador"
-            className="w-full h-auto object-cover"
+            src={user?.dashboardImage || "/images/logo-jackson-max.jpg"}
+            alt="Dashboard"
+            className="w-full h-auto object-cover rounded-lg"
             data-testid="img-logo"
           />
         </div>

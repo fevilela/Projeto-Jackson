@@ -49,14 +49,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       req.session.userId = user.id;
 
-      // Salvar a sessão explicitamente
       req.session.save((err) => {
         if (err) {
           console.error("[REGISTER] Error saving session:", err);
           return next(err);
         }
         console.log("[REGISTER] Session saved successfully for user:", user.id);
-        res.json({ id: user.id, username: user.username });
+        res.json({
+          id: user.id,
+          username: user.username,
+          profilePhoto: user.profilePhoto,
+          dashboardImage: user.dashboardImage,
+        });
       });
     } catch (error) {
       console.error("[REGISTER] Error:", error);
@@ -84,7 +88,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("[LOGIN] Password valid, setting session for user:", user.id);
       req.session.userId = user.id;
 
-      // Salvar a sessão explicitamente
       req.session.save((err) => {
         if (err) {
           console.error("[LOGIN] Error saving session:", err);
@@ -94,7 +97,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log("[LOGIN] Session ID:", req.sessionID);
         console.log("[LOGIN] Session data:", req.session);
         console.log("[LOGIN] Set-Cookie header:", res.getHeader("Set-Cookie"));
-        res.json({ id: user.id, username: user.username });
+        res.json({
+          id: user.id,
+          username: user.username,
+          profilePhoto: user.profilePhoto,
+          dashboardImage: user.dashboardImage,
+        });
       });
     } catch (error) {
       console.error("[LOGIN] Error during login:", error);
@@ -128,13 +136,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log("[AUTH/ME] User authenticated:", user.username);
-      res.json({ id: user.id, username: user.username });
+      res.json({
+        id: user.id,
+        username: user.username,
+        profilePhoto: user.profilePhoto,
+        dashboardImage: user.dashboardImage,
+      });
     } catch (error) {
+      console.error("[AUTH/ME] Error:", error);
       next(error);
     }
   });
 
-  // Profile routes
   app.get("/api/profile", requireAuth, async (req, res, next) => {
     try {
       const user = await storage.getUser(req.session.userId!);
@@ -149,6 +162,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         birthDate: user.birthDate,
         cref: user.cref,
         profilePhoto: user.profilePhoto,
+        dashboardImage: user.dashboardImage,
       });
     } catch (error) {
       next(error);
@@ -157,26 +171,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/profile", requireAuth, async (req, res, next) => {
     try {
-      const profileData = updateProfileSchema.parse(req.body);
-      const user = await storage.updateUserProfile(
+      const data = updateProfileSchema.parse(req.body);
+      const updatedUser = await storage.updateUserProfile(
         req.session.userId!,
-        profileData
+        data
       );
       res.json({
-        id: user.id,
-        username: user.username,
-        name: user.name,
-        email: user.email,
-        birthDate: user.birthDate,
-        cref: user.cref,
-        profilePhoto: user.profilePhoto,
+        id: updatedUser.id,
+        username: updatedUser.username,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        birthDate: updatedUser.birthDate,
+        cref: updatedUser.cref,
+        profilePhoto: updatedUser.profilePhoto,
+        dashboardImage: updatedUser.dashboardImage,
       });
     } catch (error) {
       next(error);
     }
   });
 
-  // Athlete routes
   app.get("/api/athletes", requireAuth, async (req, res, next) => {
     try {
       const athletes = await storage.getAthletesByUserId(req.session.userId!);
@@ -186,19 +200,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/athletes", requireAuth, async (req, res, next) => {
+  app.get("/api/athletes/:id", requireAuth, async (req, res, next) => {
     try {
-      const athleteData = insertAthleteSchema.parse({
-        ...req.body,
-        userId: req.session.userId,
-      });
-
-      const athlete = await storage.createAthlete(athleteData);
+      const athlete = await storage.getAthlete(req.params.id);
+      if (!athlete) {
+        return res.status(404).json({ error: "Atleta não encontrado" });
+      }
+      if (athlete.userId !== req.session.userId) {
+        return res
+          .status(403)
+          .json({ error: "Atleta não encontrado ou não autorizado" });
+      }
       res.json(athlete);
     } catch (error) {
       next(error);
     }
   });
+
+  app.post("/api/athletes", requireAuth, async (req, res, next) => {
+    try {
+      const data = insertAthleteSchema.parse({
+        ...req.body,
+        userId: req.session.userId,
+      });
+      const athlete = await storage.createAthlete(data);
+      res.json(athlete);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // app.patch("/api/athletes/:id", requireAuth, async (req, res, next) => {
+  //   try {
+  //     const data = insertAthleteSchema.partial().parse(req.body);
+  //     const athlete = await storage.updateAthlete(
+  //       req.params.id,
+  //       req.session.userId!,
+  //       data
+  //     );
+  //     res.json(athlete);
+  //   } catch (error) {
+  //     next(error);
+  //   }
+  // });
 
   app.delete("/api/athletes/:id", requireAuth, async (req, res, next) => {
     try {
@@ -209,55 +253,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/athletes/:id/report", requireAuth, async (req, res, next) => {
-    try {
-      const athleteId = req.params.id;
-      const userId = req.session.userId!;
-
-      const athlete = await storage.getAthletesByUserId(userId);
-      const athleteData = athlete.find((a) => a.id === athleteId);
-
-      if (!athleteData) {
-        return res.status(404).json({ error: "Atleta não encontrado" });
-      }
-
-      const [
-        tests,
-        anamnesis,
-        runningWorkouts,
-        runningPlans,
-        periodizationPlans,
-        periodizationNote,
-        strengthExercises,
-        functionalAssessments,
-      ] = await Promise.all([
-        storage.getTestsByAthleteId(athleteId, userId),
-        storage.getAnamnesisByAthleteId(athleteId, userId),
-        storage.getRunningWorkoutsByAthleteId(athleteId, userId),
-        storage.getRunningPlansByAthleteId(athleteId, userId),
-        storage.getPeriodizationPlansByAthleteId(athleteId, userId),
-        storage.getPeriodizationNoteByAthleteId(athleteId, userId),
-        storage.getStrengthExercisesByAthleteId(athleteId, userId),
-        storage.getFunctionalAssessmentsByAthleteId(athleteId, userId),
-      ]);
-
-      res.json({
-        athlete: athleteData,
-        tests,
-        anamnesis,
-        runningWorkouts,
-        runningPlans,
-        periodizationPlans,
-        periodizationNote,
-        strengthExercises,
-        functionalAssessments,
-      });
-    } catch (error) {
-      next(error);
-    }
-  });
-
-  // Test routes
   app.get("/api/tests", requireAuth, async (req, res, next) => {
     try {
       const tests = await storage.getTestsByUserId(req.session.userId!);
@@ -285,12 +280,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/tests", requireAuth, async (req, res, next) => {
     try {
-      const testData = insertTestSchema.parse({
+      const data = insertTestSchema.parse({
         ...req.body,
         userId: req.session.userId,
       });
-
-      const test = await storage.createTest(testData);
+      const test = await storage.createTest(data);
       res.json(test);
     } catch (error) {
       next(error);
@@ -306,7 +300,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Running Workout routes
   app.get(
     "/api/running-workouts/athlete/:athleteId",
     requireAuth,
@@ -325,17 +318,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/running-workouts", requireAuth, async (req, res, next) => {
     try {
-      const workoutData = insertRunningWorkoutSchema.parse({
+      const data = insertRunningWorkoutSchema.parse({
         ...req.body,
         userId: req.session.userId,
       });
-
-      const workout = await storage.createRunningWorkout(workoutData);
+      const workout = await storage.createRunningWorkout(data);
       res.json(workout);
     } catch (error) {
       next(error);
     }
   });
+
+  app.patch(
+    "/api/running-workouts/:id",
+    requireAuth,
+    async (req, res, next) => {
+      try {
+        const data = insertRunningWorkoutSchema.partial().parse(req.body);
+        const workout = await storage.updateRunningWorkout(
+          req.params.id,
+          req.session.userId!,
+          data
+        );
+        res.json(workout);
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
 
   app.delete(
     "/api/running-workouts/:id",
@@ -343,14 +353,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req, res, next) => {
       try {
         await storage.deleteRunningWorkout(req.params.id, req.session.userId!);
-        res.json({ message: "Treino de corrida excluído com sucesso" });
+        res.json({ message: "Treino excluído com sucesso" });
       } catch (error) {
         next(error);
       }
     }
   );
 
-  // Running Plan routes
   app.get(
     "/api/running-plans/athlete/:athleteId",
     requireAuth,
@@ -369,27 +378,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/running-plans", requireAuth, async (req, res, next) => {
     try {
-      const planData = insertRunningPlanSchema.parse({
+      const data = insertRunningPlanSchema.parse({
         ...req.body,
         userId: req.session.userId,
       });
-
-      const plan = await storage.createRunningPlan(planData);
-      res.json(plan);
-    } catch (error) {
-      next(error);
-    }
-  });
-
-  app.patch("/api/running-plans/:id", requireAuth, async (req, res, next) => {
-    try {
-      const planData = insertRunningPlanSchema.partial().parse(req.body);
-
-      const plan = await storage.updateRunningPlan(
-        req.params.id,
-        req.session.userId!,
-        planData
-      );
+      const plan = await storage.createRunningPlan(data);
       res.json(plan);
     } catch (error) {
       next(error);
@@ -399,13 +392,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/running-plans/:id", requireAuth, async (req, res, next) => {
     try {
       await storage.deleteRunningPlan(req.params.id, req.session.userId!);
-      res.json({ message: "Plano de corrida excluído com sucesso" });
+      res.json({ message: "Plano excluído com sucesso" });
     } catch (error) {
       next(error);
     }
   });
 
-  // Periodization Plan routes
   app.get(
     "/api/periodization-plans/athlete/:athleteId",
     requireAuth,
@@ -424,17 +416,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/periodization-plans", requireAuth, async (req, res, next) => {
     try {
-      const planData = insertPeriodizationPlanSchema.parse({
+      const data = insertPeriodizationPlanSchema.parse({
         ...req.body,
         userId: req.session.userId,
       });
-
-      const plan = await storage.createPeriodizationPlan(planData);
+      const plan = await storage.createPeriodizationPlan(data);
       res.json(plan);
     } catch (error) {
       next(error);
     }
   });
+
+  // app.patch(
+  //   "/api/periodization-plans/:id",
+  //   requireAuth,
+  //   async (req, res, next) => {
+  //     try {
+  //       const data = insertPeriodizationPlanSchema.partial().parse(req.body);
+  //       const plan = await storage.updatePeriodizationPlan(
+  //         req.params.id,
+  //         req.session.userId!,
+  //         data
+  //       );
+  //       res.json(plan);
+  //     } catch (error) {
+  //       next(error);
+  //     }
+  //   }
+  // );
 
   app.delete(
     "/api/periodization-plans/:id",
@@ -445,24 +454,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           req.params.id,
           req.session.userId!
         );
-        res.json({ message: "Plano de periodização excluído com sucesso" });
+        res.json({ message: "Plano excluído com sucesso" });
       } catch (error) {
         next(error);
       }
     }
   );
 
-  // Periodization Note routes
   app.get(
     "/api/periodization-notes/athlete/:athleteId",
     requireAuth,
     async (req, res, next) => {
       try {
-        const note = await storage.getPeriodizationNoteByAthleteId(
+        const notes = await storage.getPeriodizationNoteByAthleteId(
           req.params.athleteId,
           req.session.userId!
         );
-        res.json(note || null);
+        res.json(notes);
       } catch (error) {
         next(error);
       }
@@ -471,12 +479,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/periodization-notes", requireAuth, async (req, res, next) => {
     try {
-      const noteData = insertPeriodizationNoteSchema.parse({
+      const data = insertPeriodizationNoteSchema.parse({
         ...req.body,
         userId: req.session.userId,
       });
-
-      const note = await storage.createPeriodizationNote(noteData);
+      const note = await storage.createPeriodizationNote(data);
       res.json(note);
     } catch (error) {
       next(error);
@@ -488,14 +495,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     requireAuth,
     async (req, res, next) => {
       try {
-        const noteData = insertPeriodizationNoteSchema
-          .partial()
-          .parse(req.body);
-
+        const data = insertPeriodizationNoteSchema.partial().parse(req.body);
         const note = await storage.updatePeriodizationNote(
           req.params.id,
           req.session.userId!,
-          noteData
+          data
         );
         res.json(note);
       } catch (error) {
@@ -504,7 +508,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   );
 
-  // Strength Exercise routes
+  app.delete(
+    "/api/periodization-notes/:id",
+    requireAuth,
+    async (req, res, next) => {
+      try {
+        await storage.deletePeriodizationNote(
+          req.params.id,
+          req.session.userId!
+        );
+        res.json({ message: "Anotação excluída com sucesso" });
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
   app.get(
     "/api/strength-exercises/athlete/:athleteId",
     requireAuth,
@@ -523,12 +542,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/strength-exercises", requireAuth, async (req, res, next) => {
     try {
-      const exerciseData = insertStrengthExerciseSchema.parse({
+      const data = insertStrengthExerciseSchema.parse({
         ...req.body,
         userId: req.session.userId,
       });
-
-      const exercise = await storage.createStrengthExercise(exerciseData);
+      const exercise = await storage.createStrengthExercise(data);
       res.json(exercise);
     } catch (error) {
       next(error);
@@ -544,14 +562,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           req.params.id,
           req.session.userId!
         );
-        res.json({ message: "Exercício de força excluído com sucesso" });
+        res.json({ message: "Exercício excluído com sucesso" });
       } catch (error) {
         next(error);
       }
     }
   );
 
-  // Functional Assessment routes
   app.get(
     "/api/functional-assessments/athlete/:athleteId",
     requireAuth,
@@ -574,7 +591,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req, res, next) => {
       try {
         const { values, ...restBody } = req.body;
-
         const assessmentData = insertFunctionalAssessmentSchema.parse({
           ...restBody,
           userId: req.session.userId,

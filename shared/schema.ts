@@ -21,6 +21,7 @@ export const users = pgTable("users", {
   birthDate: text("birth_date"),
   cref: text("cref"),
   profilePhoto: text("profile_photo"),
+  dashboardImage: text("dashboard_image"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -35,6 +36,7 @@ export const updateProfileSchema = createInsertSchema(users).pick({
   birthDate: true,
   cref: true,
   profilePhoto: true,
+  dashboardImage: true,
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;

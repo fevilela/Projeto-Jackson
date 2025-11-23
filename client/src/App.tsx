@@ -6,10 +6,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { AuthProvider, useAuth } from "@/lib/auth";
+import { UserMenu } from "@/components/UserMenu";
+import { AuthProvider } from "@/lib/auth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { Button } from "@/components/ui/button";
-import { LogOut } from "lucide-react";
 import Dashboard from "@/pages/Dashboard";
 import Athletes from "@/pages/Athletes";
 import Tests from "@/pages/Tests";
@@ -27,8 +26,6 @@ import Register from "@/pages/Register";
 import NotFound from "@/pages/not-found";
 
 function MainLayout() {
-  const { logout } = useAuth();
-
   const style = {
     "--sidebar-width": "16rem",
     "--sidebar-width-icon": "3rem",
@@ -43,14 +40,7 @@ function MainLayout() {
             <SidebarTrigger data-testid="button-sidebar-toggle" />
             <div className="flex items-center gap-2">
               <ThemeToggle />
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={logout}
-                data-testid="button-logout"
-              >
-                <LogOut className="h-5 w-5" />
-              </Button>
+              <UserMenu />
             </div>
           </header>
           <main className="flex-1 overflow-auto">

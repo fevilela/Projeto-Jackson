@@ -1,15 +1,13 @@
-import {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  ReactNode,
-} from "react";
+import { createContext, useContext, ReactNode } from "react";
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import { queryClient } from "./queryClient";
 
 interface User {
   id: string;
   username: string;
+  profilePhoto?: string | null;
+  dashboardImage?: string | null;
 }
 
 interface AuthContextType {
@@ -24,29 +22,26 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   console.log("[AUTH] AuthProvider rendering");
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
   const [, setLocation] = useLocation();
 
-  useEffect(() => {
-    checkAuth();
-  }, []);
-
-  const checkAuth = async () => {
-    try {
-      const response = await fetch("/api/auth/me", {
-        credentials: "include",
-      });
-      if (response.ok) {
-        const userData = await response.json();
-        setUser(userData);
+  const { data: user, isLoading: loading } = useQuery<User | null>({
+    queryKey: ["/api/auth/me"],
+    queryFn: async () => {
+      try {
+        const response = await fetch("/api/auth/me", {
+          credentials: "include",
+        });
+        if (response.ok) {
+          return await response.json();
+        }
+        return null;
+      } catch (error) {
+        console.error("Error checking auth:", error);
+        return null;
       }
-    } catch (error) {
-      console.error("Error checking auth:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    retry: false,
+  });
 
   const login = async (username: string, password: string) => {
     const response = await fetch("/api/auth/login", {
@@ -62,7 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const userData = await response.json();
-    setUser(userData);
+    queryClient.setQueryData(["/api/auth/me"], userData);
     setLocation("/");
   };
 
@@ -80,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const userData = await response.json();
-    setUser(userData);
+    queryClient.setQueryData(["/api/auth/me"], userData);
     setLocation("/");
   };
 
@@ -89,12 +84,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       method: "POST",
       credentials: "include",
     });
-    setUser(null);
+    queryClient.setQueryData(["/api/auth/me"], null);
     setLocation("/login");
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider
+      value={{ user: user || null, loading, login, register, logout }}
+    >
       {children}
     </AuthContext.Provider>
   );

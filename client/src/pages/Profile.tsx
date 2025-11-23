@@ -33,6 +33,7 @@ const profileSchema = z.object({
   birthDate: z.string().optional(),
   cref: z.string().optional(),
   profilePhoto: z.string().optional(),
+  dashboardImage: z.string().optional(),
 });
 
 type ProfileFormData = z.infer<typeof profileSchema>;
@@ -45,11 +46,13 @@ interface ProfileData {
   birthDate?: string | null;
   cref?: string | null;
   profilePhoto?: string | null;
+  dashboardImage?: string | null;
 }
 
 export default function Profile() {
   const { toast } = useToast();
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [dashboardPreview, setDashboardPreview] = useState<string | null>(null);
 
   const { data: profile, isLoading } = useQuery<ProfileData>({
     queryKey: ["/api/profile"],
@@ -63,6 +66,7 @@ export default function Profile() {
       birthDate: profile?.birthDate || "",
       cref: profile?.cref || "",
       profilePhoto: profile?.profilePhoto || "",
+      dashboardImage: profile?.dashboardImage || "",
     },
   });
 
@@ -72,6 +76,7 @@ export default function Profile() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
       toast({
         title: "Sucesso",
         description: "Perfil atualizado com sucesso",
@@ -103,6 +108,21 @@ export default function Profile() {
     }
   };
 
+  const handleDashboardImageChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+        setDashboardPreview(base64String);
+        form.setValue("dashboardImage", base64String);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const getInitials = (name?: string | null, username?: string) => {
     if (name) {
       return name
@@ -123,6 +143,7 @@ export default function Profile() {
   }
 
   const displayPhoto = photoPreview || profile?.profilePhoto;
+  const displayDashboardImage = dashboardPreview || profile?.dashboardImage;
 
   return (
     <div className="container mx-auto p-6 space-y-6" data-testid="page-profile">
@@ -264,6 +285,53 @@ export default function Profile() {
               </Button>
             </form>
           </Form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Imagem do Dashboard</CardTitle>
+          <CardDescription>
+            Personalize a imagem principal da sua página inicial
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {displayDashboardImage && (
+            <div className="rounded-lg overflow-hidden border">
+              <img
+                src={displayDashboardImage}
+                alt="Preview da imagem do dashboard"
+                className="w-full h-auto max-h-64 object-cover"
+                data-testid="img-dashboard-preview"
+              />
+            </div>
+          )}
+          <div className="flex flex-col gap-2">
+            <label htmlFor="dashboard-upload">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() =>
+                  document.getElementById("dashboard-upload")?.click()
+                }
+                data-testid="button-upload-dashboard"
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                {displayDashboardImage ? "Trocar Imagem" : "Adicionar Imagem"}
+              </Button>
+            </label>
+            <input
+              id="dashboard-upload"
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleDashboardImageChange}
+              data-testid="input-dashboard-upload"
+            />
+            <p className="text-sm text-muted-foreground">
+              Esta imagem aparecerá no topo da sua página inicial
+            </p>
+          </div>
         </CardContent>
       </Card>
     </div>
