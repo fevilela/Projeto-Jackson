@@ -1,5 +1,6 @@
 import { Link, useLocation } from "wouter";
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   Sidebar,
   SidebarContent,
@@ -18,6 +19,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { Badge } from "@/components/ui/badge";
 import {
   Users,
   Activity,
@@ -36,6 +38,7 @@ import {
   DollarSign,
   UserCircle,
 } from "lucide-react";
+import type { FinancialTransaction } from "@shared/schema";
 
 const cadastroItems = [
   {
@@ -96,6 +99,36 @@ const otherMenuItems = [
 export function AppSidebar() {
   const [location] = useLocation();
   const [isCadastroOpen, setIsCadastroOpen] = useState(true);
+
+  const { data: transactions = [] } = useQuery<
+    (FinancialTransaction & { athleteName?: string | null })[]
+  >({
+    queryKey: ["/api/financial-transactions"],
+  });
+
+  const pendingRemindersCount = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const threeDaysFromNow = new Date(today);
+    threeDaysFromNow.setDate(today.getDate() + 3);
+
+    return transactions.filter((transaction) => {
+      if (!transaction.athleteId) return false;
+
+      // Se está totalmente pago, não mostrar
+      const totalAmount = parseFloat(transaction.totalAmount);
+      const paidAmount = parseFloat(transaction.paidAmount);
+      if (paidAmount >= totalAmount) return false;
+
+      const dueDate = new Date(transaction.dueDate);
+      dueDate.setHours(0, 0, 0, 0);
+
+      const isOverdue = dueDate < today;
+      const isDueSoon = dueDate >= today && dueDate <= threeDaysFromNow;
+
+      return isOverdue || isDueSoon;
+    }).length;
+  }, [transactions]);
 
   return (
     <Sidebar data-testid="sidebar-main">
@@ -161,6 +194,16 @@ export function AppSidebar() {
                     <Link href={item.url}>
                       <item.icon />
                       <span>{item.title}</span>
+                      {item.url === "/financial" &&
+                        pendingRemindersCount > 0 && (
+                          <Badge
+                            variant="destructive"
+                            className="ml-auto animate-pulse"
+                            data-testid="badge-financial-notifications"
+                          >
+                            {pendingRemindersCount}
+                          </Badge>
+                        )}
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

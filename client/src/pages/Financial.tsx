@@ -57,6 +57,8 @@ import {
   DollarSign,
   Search,
   Download,
+  MessageCircle,
+  Bell,
 } from "lucide-react";
 import type { FinancialTransaction, Athlete } from "@shared/schema";
 import jsPDF from "jspdf";
@@ -302,6 +304,63 @@ export default function Financial() {
 
   const summary = calculateSummary();
 
+  const pendingReminders = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const threeDaysFromNow = new Date(today);
+    threeDaysFromNow.setDate(today.getDate() + 3);
+
+    return transactions.filter((transaction) => {
+      if (!transaction.athleteId) return false;
+
+      // Se está totalmente pago, não mostrar
+      const totalAmount = parseFloat(transaction.totalAmount);
+      const paidAmount = parseFloat(transaction.paidAmount);
+      if (paidAmount >= totalAmount) return false;
+
+      const dueDate = new Date(transaction.dueDate);
+      dueDate.setHours(0, 0, 0, 0);
+
+      const isOverdue = dueDate < today;
+      const isDueSoon = dueDate >= today && dueDate <= threeDaysFromNow;
+
+      return isOverdue || isDueSoon;
+    });
+  }, [transactions]);
+
+  const generateWhatsAppLink = (
+    phone: string | undefined | null,
+    athleteName: string | undefined | null,
+    dueDate: string,
+    totalAmount: string,
+    paidAmount: string,
+    isOverdue: boolean
+  ) => {
+    if (!phone) return null;
+
+    const cleanPhone = phone.replace(/\D/g, "");
+    if (cleanPhone.length < 10) return null;
+
+    const formattedDate = format(new Date(dueDate), "dd/MM/yyyy", {
+      locale: ptBR,
+    });
+    const remainingAmount = parseFloat(totalAmount) - parseFloat(paidAmount);
+    const message = `Olá${
+      athleteName ? ` ${athleteName}` : ""
+    }! Lembrando que você tem um pagamento${
+      isOverdue ? " *atrasado*" : ""
+    } com vencimento em *${formattedDate}*. ${
+      parseFloat(paidAmount) > 0
+        ? `Você já pagou R$ ${parseFloat(paidAmount).toFixed(
+            2
+          )} e ainda falta *R$ ${remainingAmount.toFixed(2)}*.`
+        : `Valor a pagar: *R$ ${remainingAmount.toFixed(2)}*.`
+    } Por favor, não esqueça! 😊`;
+
+    const encodedMessage = encodeURIComponent(message);
+    return `https://wa.me/55${cleanPhone}?text=${encodedMessage}`;
+  };
+
   const filteredTransactions = useMemo(() => {
     return transactions.filter((transaction) => {
       const matchesAthlete = searchAthlete
@@ -492,6 +551,120 @@ export default function Financial() {
           </CardContent>
         </Card>
       </div>
+
+      {pendingReminders.length > 0 && (
+        <Card className="border-destructive/50 bg-destructive/5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <div className="relative">
+                <Bell className="h-5 w-5 text-destructive" />
+                <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-destructive"></span>
+                </span>
+              </div>
+              Lembretes de Pagamento
+            </CardTitle>
+            <CardDescription>
+              {pendingReminders.length}{" "}
+              {pendingReminders.length === 1
+                ? "pagamento precisa"
+                : "pagamentos precisam"}{" "}
+              de atenção
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {pendingReminders.map((transaction) => {
+                const athlete = athletes.find(
+                  (a) => a.id === transaction.athleteId
+                );
+                const dueDate = new Date(transaction.dueDate);
+                dueDate.setHours(0, 0, 0, 0);
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const isOverdue = dueDate < today;
+                const remainingAmount =
+                  parseFloat(transaction.totalAmount) -
+                  parseFloat(transaction.paidAmount);
+                const whatsappLink = generateWhatsAppLink(
+                  athlete?.phone,
+                  transaction.athleteName,
+                  transaction.dueDate,
+                  transaction.totalAmount,
+                  transaction.paidAmount,
+                  isOverdue
+                );
+
+                return (
+                  <div
+                    key={transaction.id}
+                    className="flex items-center justify-between p-4 bg-white dark:bg-card rounded-lg border gap-4"
+                    data-testid={`reminder-${transaction.id}`}
+                  >
+                    <div className="flex-1">
+                      <div className="font-semibold">
+                        {transaction.athleteName || "Sem atleta"}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {transaction.description} -
+                        {parseFloat(transaction.paidAmount) > 0 ? (
+                          <>
+                            {" "}
+                            Falta:{" "}
+                            <span className="font-semibold text-destructive">
+                              R$ {remainingAmount.toFixed(2)}
+                            </span>{" "}
+                            (Pago: R${" "}
+                            {parseFloat(transaction.paidAmount).toFixed(2)} de
+                            R$ {parseFloat(transaction.totalAmount).toFixed(2)})
+                          </>
+                        ) : (
+                          <>
+                            {" "}
+                            Valor:{" "}
+                            <span className="font-semibold">
+                              R${" "}
+                              {parseFloat(transaction.totalAmount).toFixed(2)}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                      <div className="text-sm mt-1">
+                        <span
+                          className={
+                            isOverdue ? "text-red-600 font-medium" : ""
+                          }
+                        >
+                          Vencimento:{" "}
+                          {format(new Date(transaction.dueDate), "dd/MM/yyyy", {
+                            locale: ptBR,
+                          })}
+                          {isOverdue && " (Atrasado)"}
+                        </span>
+                      </div>
+                    </div>
+                    {whatsappLink ? (
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                        onClick={() => window.open(whatsappLink, "_blank")}
+                        data-testid={`button-whatsapp-${transaction.id}`}
+                      >
+                        <MessageCircle className="h-4 w-4 mr-2" />
+                        Enviar Lembrete
+                      </Button>
+                    ) : (
+                      <Badge variant="secondary">Sem telefone</Badge>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

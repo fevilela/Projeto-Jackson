@@ -1,6 +1,14 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Users, Eye, FileDown, Phone, Mail, Edit } from "lucide-react";
 import { generateAthleteReport } from "@/lib/generateAthleteReport";
 import { useToast } from "@/hooks/use-toast";
@@ -66,79 +74,94 @@ export function AthleteList({
             <p>Nenhum atleta cadastrado ainda</p>
           </div>
         ) : (
-          <div className="space-y-2">
-            {athletes.map((athlete) => (
-              <div
-                key={athlete.id}
-                className="flex items-center justify-between p-4 rounded-lg border hover-elevate"
-                data-testid={`athlete-item-${athlete.id}`}
-              >
-                <div className="flex-1">
-                  <h4 className="font-semibold">{athlete.name}</h4>
-                  <div className="flex gap-2 mt-1 flex-wrap">
-                    <Badge variant="outline" className="text-xs">
-                      {athlete.age} anos
-                    </Badge>
-                    <Badge variant="outline" className="text-xs">
-                      {athlete.sport}
-                    </Badge>
-                  </div>
-                  {(athlete.phone || athlete.email) && (
-                    <div className="flex gap-3 mt-2 text-xs text-muted-foreground">
-                      {athlete.phone && (
-                        <span className="flex items-center gap-1">
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Idade</TableHead>
+                  <TableHead>Modalidade</TableHead>
+                  <TableHead>Telefone</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {athletes.map((athlete) => (
+                  <TableRow
+                    key={athlete.id}
+                    data-testid={`athlete-item-${athlete.id}`}
+                  >
+                    <TableCell className="font-medium">
+                      {athlete.name}
+                    </TableCell>
+                    <TableCell>{athlete.age} anos</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{athlete.sport}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      {athlete.phone ? (
+                        <span className="flex items-center gap-1 text-sm text-muted-foreground">
                           <Phone className="h-3 w-3" />
                           {athlete.phone}
                         </span>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
                       )}
-                      {athlete.email && (
-                        <span className="flex items-center gap-1">
+                    </TableCell>
+                    <TableCell>
+                      {athlete.email ? (
+                        <span className="flex items-center gap-1 text-sm text-muted-foreground">
                           <Mail className="h-3 w-3" />
                           {athlete.email}
                         </span>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
                       )}
-                    </div>
-                  )}
-                </div>
-                <div className="flex gap-2">
-                  {onEditAthlete && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => onEditAthlete(athlete)}
-                      data-testid={`button-edit-athlete-${athlete.id}`}
-                      title="Editar atleta"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() =>
-                      handleDownloadReport(athlete.id, athlete.name)
-                    }
-                    disabled={downloadingId === athlete.id}
-                    data-testid={`button-download-report-${athlete.id}`}
-                    title="Baixar relatório completo em PDF"
-                  >
-                    <FileDown className="h-4 w-4 mr-1" />
-                    {downloadingId === athlete.id ? "Gerando..." : "PDF"}
-                  </Button>
-                  {onSelectAthlete && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => onSelectAthlete(athlete.id)}
-                      data-testid={`button-view-athlete-${athlete.id}`}
-                    >
-                      <Eye className="h-4 w-4 mr-1" />
-                      Ver
-                    </Button>
-                  )}
-                </div>
-              </div>
-            ))}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex gap-2 justify-end">
+                        {onEditAthlete && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onEditAthlete(athlete)}
+                            data-testid={`button-edit-athlete-${athlete.id}`}
+                            title="Editar atleta"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            handleDownloadReport(athlete.id, athlete.name)
+                          }
+                          disabled={downloadingId === athlete.id}
+                          data-testid={`button-download-report-${athlete.id}`}
+                          title="Baixar relatório completo em PDF"
+                        >
+                          <FileDown className="h-4 w-4 mr-1" />
+                          {downloadingId === athlete.id ? "Gerando..." : "PDF"}
+                        </Button>
+                        {onSelectAthlete && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onSelectAthlete(athlete.id)}
+                            data-testid={`button-view-athlete-${athlete.id}`}
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            Ver
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
         )}
       </CardContent>
