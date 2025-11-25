@@ -19,8 +19,10 @@ import {
   insertAnamnesisSchema,
   updateAnamnesisSchema,
   insertFinancialTransactionSchema,
+  requestPasswordResetSchema,
 } from "@shared/schema";
 import { z } from "zod";
+import { sendEmail, generatePasswordResetEmail } from "./email";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth routes
@@ -148,6 +150,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/auth/forgot-password", async (req, res, next) => {
+    try {
+      const { email } = requestPasswordResetSchema.parse(req.body);
+
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.json({
+          message:
+            "Se o email estiver cadastrado, você receberá um código de recuperação.",
+        });
+      }
+
+      await storage.deleteExpiredPasswordResetTokens();
+
+      const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+      await storage.createPasswordResetToken(user.id, resetCode, expiresAt);
+
+      const emailSent = await sendEmail({
+        to: email,
+        subject: "Recuperação de Senha - Sistema de Avaliação Física",
+        html: generatePasswordResetEmail(resetCode),
+      });
+
+      if (!emailSent) {
+        return res.status(500).json({
+          error:
+            "Erro ao enviar email. Verifique a configuração do servidor de email.",
+        });
+      }
+
+      res.json({
+        message:
+          "Se o email estiver cadastrado, você receberá um código de recuperação.",
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/auth/reset-password", async (req, res, next) => {
+    try {
+      const resetSchema = z.object({
+        token: z.string(),
+        newPassword: z.string().min(6),
+      });
+      const { token, newPassword } = resetSchema.parse(req.body);
+
+      const resetToken = await storage.getPasswordResetToken(token);
+      if (!resetToken) {
+        return res.status(400).json({ error: "Código inválido ou expirado" });
+      }
+
+      if (new Date() > new Date(resetToken.expiresAt)) {
+        await storage.deletePasswordResetToken(token);
+        return res.status(400).json({ error: "Código expirado" });
+      }
+
+      const hashedPassword = await hashPassword(newPassword);
+      await storage.updateUserPassword(resetToken.userId, hashedPassword);
+      await storage.deletePasswordResetToken(token);
+
+      res.json({ message: "Senha redefinida com sucesso" });
+    } catch (error) {
+      next(error);
+    }
+  });
   app.get("/api/profile", requireAuth, async (req, res, next) => {
     try {
       const user = await storage.getUser(req.session.userId!);
@@ -248,6 +318,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       await storage.deleteAthlete(req.params.id, req.session.userId!);
       res.json({ message: "Atleta excluído com sucesso" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/athletes/:id/report", requireAuth, async (req, res, next) => {
+    try {
+      const athleteId = req.params.id;
+      const userId = req.session.userId!;
+
+      const athlete = await storage.getAthlete(athleteId);
+      if (!athlete || athlete.userId !== userId) {
+        return res.status(404).json({ error: "Atleta não encontrado" });
+      }
+
+      const [
+        tests,
+        anamnesis,
+        runningWorkouts,
+        runningPlans,
+        periodizationPlans,
+        strengthExercises,
+        functionalAssessments,
+        periodizationNote,
+      ] = await Promise.all([
+        storage.getTestsByAthleteId(athleteId, userId),
+        storage.getAnamnesisByAthleteId(athleteId, userId),
+        storage.getRunningWorkoutsByAthleteId(athleteId, userId),
+        storage.getRunningPlansByAthleteId(athleteId, userId),
+        storage.getPeriodizationPlansByAthleteId(athleteId, userId),
+        storage.getStrengthExercisesByAthleteId(athleteId, userId),
+        storage.getFunctionalAssessmentsByAthleteId(athleteId, userId),
+        storage.getPeriodizationNoteByAthleteId(athleteId, userId),
+      ]);
+
+      res.json({
+        athlete,
+        tests,
+        anamnesis,
+        runningWorkouts,
+        runningPlans,
+        periodizationPlans,
+        periodizationNote,
+        strengthExercises,
+        functionalAssessments,
+      });
     } catch (error) {
       next(error);
     }

@@ -1,4 +1,4 @@
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { db } from "./db";
 import {
   users,
@@ -16,6 +16,7 @@ import {
   functionalAssessmentValues,
   anamnesis,
   financialTransactions,
+  passwordResetTokens,
   type User,
   type InsertUser,
   type UpdateProfile,
@@ -47,15 +48,28 @@ import {
   type InsertAnamnesis,
   type FinancialTransaction,
   type InsertFinancialTransaction,
+  type PasswordResetToken,
 } from "@shared/schema";
 
 export interface IStorage {
   // User methods
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUserProfile(id: string, profile: UpdateProfile): Promise<User>;
+  updateUserPassword(id: string, hashedPassword: string): Promise<void>;
   deletePeriodizationNote(id: string, userId: string): Promise<void>;
+
+  // Password Reset methods
+  createPasswordResetToken(
+    userId: string,
+    token: string,
+    expiresAt: Date
+  ): Promise<PasswordResetToken>;
+  getPasswordResetToken(token: string): Promise<PasswordResetToken | undefined>;
+  deletePasswordResetToken(token: string): Promise<void>;
+  deleteExpiredPasswordResetTokens(): Promise<void>;
 
   // Athlete methods
   getAthletesByUserId(userId: string): Promise<Athlete[]>;
@@ -245,6 +259,58 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, id))
       .returning();
     return result[0];
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const result = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
+    return result[0];
+  }
+
+  async updateUserPassword(id: string, hashedPassword: string): Promise<void> {
+    await db
+      .update(users)
+      .set({ password: hashedPassword })
+      .where(eq(users.id, id));
+  }
+
+  // Password Reset methods
+  async createPasswordResetToken(
+    userId: string,
+    token: string,
+    expiresAt: Date
+  ): Promise<PasswordResetToken> {
+    const result = await db
+      .insert(passwordResetTokens)
+      .values({ userId, token, expiresAt })
+      .returning();
+    return result[0];
+  }
+
+  async getPasswordResetToken(
+    token: string
+  ): Promise<PasswordResetToken | undefined> {
+    const result = await db
+      .select()
+      .from(passwordResetTokens)
+      .where(eq(passwordResetTokens.token, token))
+      .limit(1);
+    return result[0];
+  }
+
+  async deletePasswordResetToken(token: string): Promise<void> {
+    await db
+      .delete(passwordResetTokens)
+      .where(eq(passwordResetTokens.token, token));
+  }
+
+  async deleteExpiredPasswordResetTokens(): Promise<void> {
+    await db
+      .delete(passwordResetTokens)
+      .where(sql`${passwordResetTokens.expiresAt} < NOW()`);
   }
 
   // Athlete methods
