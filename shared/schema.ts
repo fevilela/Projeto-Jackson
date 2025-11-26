@@ -461,3 +461,23 @@ export type InsertFinancialTransaction = z.infer<
   typeof insertFinancialTransactionSchema
 >;
 export type FinancialTransaction = typeof financialTransactions.$inferSelect;
+
+// Password Reset Tokens
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  token: text("token").notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
+
+// Password Reset Request Schema
+export const requestPasswordResetSchema = z.object({
+  email: z.string().email(),
+});

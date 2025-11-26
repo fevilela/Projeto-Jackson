@@ -169,17 +169,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await storage.createPasswordResetToken(user.id, resetCode, expiresAt);
 
+      const emailHtml = generatePasswordResetEmail(resetCode);
+
+      // Ensure we have an email address before attempting to send
+      if (!user.email) {
+        console.error("[FORGOT-PASSWORD] No email found for user:", user.id);
+        return res.status(500).json({ error: "Erro ao enviar email." });
+      }
+
       const emailSent = await sendEmail({
-        to: email,
-        subject: "Recuperação de Senha - Sistema de Avaliação Física",
-        html: generatePasswordResetEmail(resetCode),
+        to: user.email,
+        subject: "Recuperação de Senha",
+        html: emailHtml,
       });
 
       if (!emailSent) {
-        return res.status(500).json({
-          error:
-            "Erro ao enviar email. Verifique a configuração do servidor de email.",
-        });
+        return res.status(500).json({ error: "Erro ao enviar email." });
       }
 
       res.json({
