@@ -17,6 +17,7 @@ import {
   anamnesis,
   financialTransactions,
   passwordResetTokens,
+  athletePasswordResets,
   type User,
   type InsertUser,
   type UpdateProfile,
@@ -214,6 +215,25 @@ export interface IStorage {
     transaction: Partial<InsertFinancialTransaction>
   ): Promise<FinancialTransaction>;
   deleteFinancialTransaction(id: string, userId: string): Promise<void>;
+
+  // Athlete Auth methods
+  getAthleteByEmail(email: string): Promise<Athlete | undefined>;
+  updateAthletePassword(
+    athleteId: string,
+    hashedPassword: string
+  ): Promise<void>;
+  updateAthleteLastLogin(athleteId: string): Promise<void>;
+  createAthletePasswordReset(
+    athleteId: string,
+    code: string,
+    expiresAt: Date
+  ): Promise<void>;
+  getAthletePasswordReset(
+    athleteId: string,
+    code: string
+  ): Promise<{ id: string; expiresAt: Date; usedAt: Date | null } | undefined>;
+  markAthletePasswordResetUsed(id: string): Promise<void>;
+  deleteExpiredAthletePasswordResets(): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -971,6 +991,80 @@ export class DatabaseStorage implements IStorage {
           eq(financialTransactions.userId, userId)
         )
       );
+  }
+
+  // Athlete Auth methods
+  async getAthleteByEmail(email: string): Promise<Athlete | undefined> {
+    const result = await db
+      .select()
+      .from(athletes)
+      .where(eq(athletes.email, email))
+      .limit(1);
+    return result[0];
+  }
+
+  async updateAthletePassword(
+    athleteId: string,
+    hashedPassword: string
+  ): Promise<void> {
+    await db
+      .update(athletes)
+      .set({ password: hashedPassword, passwordSetAt: new Date() })
+      .where(eq(athletes.id, athleteId));
+  }
+
+  async updateAthleteLastLogin(athleteId: string): Promise<void> {
+    await db
+      .update(athletes)
+      .set({ lastLoginAt: new Date() })
+      .where(eq(athletes.id, athleteId));
+  }
+
+  async createAthletePasswordReset(
+    athleteId: string,
+    code: string,
+    expiresAt: Date
+  ): Promise<void> {
+    await db.insert(athletePasswordResets).values({
+      athleteId,
+      code,
+      expiresAt,
+    });
+  }
+
+  async getAthletePasswordReset(
+    athleteId: string,
+    code: string
+  ): Promise<{ id: string; expiresAt: Date; usedAt: Date | null } | undefined> {
+    const result = await db
+      .select({
+        id: athletePasswordResets.id,
+        expiresAt: athletePasswordResets.expiresAt,
+        usedAt: athletePasswordResets.usedAt,
+      })
+      .from(athletePasswordResets)
+      .where(
+        and(
+          eq(athletePasswordResets.athleteId, athleteId),
+          eq(athletePasswordResets.code, code)
+        )
+      )
+      .orderBy(desc(athletePasswordResets.createdAt))
+      .limit(1);
+    return result[0];
+  }
+
+  async markAthletePasswordResetUsed(id: string): Promise<void> {
+    await db
+      .update(athletePasswordResets)
+      .set({ usedAt: new Date() })
+      .where(eq(athletePasswordResets.id, id));
+  }
+
+  async deleteExpiredAthletePasswordResets(): Promise<void> {
+    await db
+      .delete(athletePasswordResets)
+      .where(sql`${athletePasswordResets.expiresAt} < NOW()`);
   }
 }
 

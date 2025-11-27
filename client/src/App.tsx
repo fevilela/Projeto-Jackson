@@ -25,6 +25,10 @@ import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import ForgotPassword from "@/pages/ForgotPassword";
 import ResetPassword from "@/pages/ResetPassword";
+import AthleteLogin from "@/pages/AthleteLogin";
+import AthleteRequestAccess from "@/pages/AthleteRequestAccess";
+import AthleteSetPassword from "@/pages/AthleteSetPassword";
+import AthleteDashboard from "@/pages/AthleteDashboard";
 import NotFound from "@/pages/not-found";
 
 function MainLayout() {
@@ -75,6 +79,10 @@ function Router() {
       <Route path="/register" component={Register} />
       <Route path="/forgot-password" component={ForgotPassword} />
       <Route path="/reset-password" component={ResetPassword} />
+      <Route path="/atleta/login" component={AthleteLogin} />
+      <Route path="/atleta/solicitar-acesso" component={AthleteRequestAccess} />
+      <Route path="/atleta/criar-senha" component={AthleteSetPassword} />
+      <Route path="/atleta" component={AthleteDashboard} />
       <Route path="/athletes">
         <ProtectedRoute>
           <MainLayout />

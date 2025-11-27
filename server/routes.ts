@@ -1,7 +1,13 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { hashPassword, verifyPassword, requireAuth } from "./auth";
+import {
+  hashPassword,
+  verifyPassword,
+  requireAuth,
+  requireAthleteAuth,
+  generateResetCode,
+} from "./auth";
 import {
   insertUserSchema,
   updateProfileSchema,
@@ -20,9 +26,17 @@ import {
   updateAnamnesisSchema,
   insertFinancialTransactionSchema,
   requestPasswordResetSchema,
+  athleteLoginSchema,
+  athleteRequestResetSchema,
+  athleteVerifyCodeSchema,
+  athleteSetPasswordSchema,
 } from "@shared/schema";
 import { z } from "zod";
-import { sendEmail, generatePasswordResetEmail } from "./email";
+import {
+  sendEmail,
+  generatePasswordResetEmail,
+  sendAthleteAccessCode,
+} from "./email";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth routes
@@ -1092,6 +1106,355 @@ export async function registerRoutes(app: Express): Promise<Server> {
           req.session.userId!
         );
         res.json({ message: "Transação excluída com sucesso" });
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  // ========== ATHLETE AUTH ROUTES ==========
+
+  // Request password reset code
+  app.post("/api/athlete/auth/request-reset", async (req, res, next) => {
+    try {
+      const { email } = athleteRequestResetSchema.parse(req.body);
+
+      const athlete = await storage.getAthleteByEmail(email);
+      if (!athlete) {
+        // Don't reveal if email exists
+        return res.json({
+          message:
+            "Se o email estiver cadastrado, você receberá um código de acesso.",
+        });
+      }
+
+      const code = generateResetCode();
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+
+      await storage.createAthletePasswordReset(athlete.id, code, expiresAt);
+
+      const emailSent = await sendAthleteAccessCode(email, code, athlete.name);
+
+      if (!emailSent) {
+        console.log(
+          `[ATHLETE AUTH] Failed to send email to ${email}, code: ${code}`
+        );
+      }
+
+      res.json({
+        message:
+          "Se o email estiver cadastrado, você receberá um código de acesso.",
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Verify code
+  app.post("/api/athlete/auth/verify-code", async (req, res, next) => {
+    try {
+      const { email, code } = athleteVerifyCodeSchema.parse(req.body);
+
+      const athlete = await storage.getAthleteByEmail(email);
+      if (!athlete) {
+        return res.status(400).json({ error: "Código inválido ou expirado" });
+      }
+
+      const resetRecord = await storage.getAthletePasswordReset(
+        athlete.id,
+        code
+      );
+
+      if (!resetRecord) {
+        return res.status(400).json({ error: "Código inválido ou expirado" });
+      }
+
+      if (resetRecord.usedAt) {
+        return res.status(400).json({ error: "Código já utilizado" });
+      }
+
+      if (new Date() > resetRecord.expiresAt) {
+        return res.status(400).json({ error: "Código expirado" });
+      }
+
+      res.json({ valid: true });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Set password
+  app.post("/api/athlete/auth/set-password", async (req, res, next) => {
+    try {
+      const { email, code, password } = athleteSetPasswordSchema.parse(
+        req.body
+      );
+
+      const athlete = await storage.getAthleteByEmail(email);
+      if (!athlete) {
+        return res.status(400).json({ error: "Código inválido ou expirado" });
+      }
+
+      const resetRecord = await storage.getAthletePasswordReset(
+        athlete.id,
+        code
+      );
+
+      if (
+        !resetRecord ||
+        resetRecord.usedAt ||
+        new Date() > resetRecord.expiresAt
+      ) {
+        return res.status(400).json({ error: "Código inválido ou expirado" });
+      }
+
+      const hashedPassword = await hashPassword(password);
+      await storage.updateAthletePassword(athlete.id, hashedPassword);
+      await storage.markAthletePasswordResetUsed(resetRecord.id);
+
+      res.json({ message: "Senha criada com sucesso!" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Athlete login
+  app.post("/api/athlete/auth/login", async (req, res, next) => {
+    try {
+      const { email, password } = athleteLoginSchema.parse(req.body);
+
+      const athlete = await storage.getAthleteByEmail(email);
+      if (!athlete || !athlete.password) {
+        return res.status(401).json({ error: "Credenciais inválidas" });
+      }
+
+      const valid = await verifyPassword(password, athlete.password);
+      if (!valid) {
+        return res.status(401).json({ error: "Credenciais inválidas" });
+      }
+
+      await storage.updateAthleteLastLogin(athlete.id);
+
+      req.session.athleteId = athlete.id;
+
+      req.session.save((err) => {
+        if (err) {
+          return next(err);
+        }
+        res.json({
+          id: athlete.id,
+          name: athlete.name,
+          email: athlete.email,
+          sport: athlete.sport,
+        });
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Athlete logout
+  app.post("/api/athlete/auth/logout", (req, res) => {
+    req.session.destroy((err) => {
+      if (err) {
+        return res.status(500).json({ error: "Erro ao fazer logout" });
+      }
+      res.json({ message: "Logout realizado com sucesso" });
+    });
+  });
+
+  // Get current athlete
+  app.get("/api/athlete/auth/me", async (req, res, next) => {
+    try {
+      if (!req.session.athleteId) {
+        return res.status(401).json({ error: "Não autenticado" });
+      }
+
+      const athlete = await storage.getAthlete(req.session.athleteId);
+      if (!athlete) {
+        return res.status(401).json({ error: "Atleta não encontrado" });
+      }
+
+      res.json({
+        id: athlete.id,
+        name: athlete.name,
+        email: athlete.email,
+        sport: athlete.sport,
+        age: athlete.age,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // ========== ATHLETE DATA ROUTES (READ-ONLY) ==========
+
+  // Get athlete's tests
+  app.get("/api/athlete/tests", requireAthleteAuth, async (req, res, next) => {
+    try {
+      const athlete = await storage.getAthlete(req.session.athleteId!);
+      if (!athlete) {
+        return res.status(404).json({ error: "Atleta não encontrado" });
+      }
+
+      const tests = await storage.getTestsByAthleteId(
+        athlete.id,
+        athlete.userId
+      );
+      res.json(tests);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Get athlete's anamnesis
+  app.get(
+    "/api/athlete/anamnesis",
+    requireAthleteAuth,
+    async (req, res, next) => {
+      try {
+        const athlete = await storage.getAthlete(req.session.athleteId!);
+        if (!athlete) {
+          return res.status(404).json({ error: "Atleta não encontrado" });
+        }
+
+        const anamnesisData = await storage.getAnamnesisByAthleteId(
+          athlete.id,
+          athlete.userId
+        );
+        res.json(anamnesisData);
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  // Get athlete's running workouts
+  app.get(
+    "/api/athlete/running-workouts",
+    requireAthleteAuth,
+    async (req, res, next) => {
+      try {
+        const athlete = await storage.getAthlete(req.session.athleteId!);
+        if (!athlete) {
+          return res.status(404).json({ error: "Atleta não encontrado" });
+        }
+
+        const workouts = await storage.getRunningWorkoutsByAthleteId(
+          athlete.id,
+          athlete.userId
+        );
+        res.json(workouts);
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  // Get athlete's running plans
+  app.get(
+    "/api/athlete/running-plans",
+    requireAthleteAuth,
+    async (req, res, next) => {
+      try {
+        const athlete = await storage.getAthlete(req.session.athleteId!);
+        if (!athlete) {
+          return res.status(404).json({ error: "Atleta não encontrado" });
+        }
+
+        const plans = await storage.getRunningPlansByAthleteId(
+          athlete.id,
+          athlete.userId
+        );
+        res.json(plans);
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  // Get athlete's periodization plans
+  app.get(
+    "/api/athlete/periodization-plans",
+    requireAthleteAuth,
+    async (req, res, next) => {
+      try {
+        const athlete = await storage.getAthlete(req.session.athleteId!);
+        if (!athlete) {
+          return res.status(404).json({ error: "Atleta não encontrado" });
+        }
+
+        const plans = await storage.getPeriodizationPlansByAthleteId(
+          athlete.id,
+          athlete.userId
+        );
+        res.json(plans);
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  // Get athlete's periodization note
+  app.get(
+    "/api/athlete/periodization-note",
+    requireAthleteAuth,
+    async (req, res, next) => {
+      try {
+        const athlete = await storage.getAthlete(req.session.athleteId!);
+        if (!athlete) {
+          return res.status(404).json({ error: "Atleta não encontrado" });
+        }
+
+        const note = await storage.getPeriodizationNoteByAthleteId(
+          athlete.id,
+          athlete.userId
+        );
+        res.json(note || null);
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  // Get athlete's strength exercises
+  app.get(
+    "/api/athlete/strength-exercises",
+    requireAthleteAuth,
+    async (req, res, next) => {
+      try {
+        const athlete = await storage.getAthlete(req.session.athleteId!);
+        if (!athlete) {
+          return res.status(404).json({ error: "Atleta não encontrado" });
+        }
+
+        const exercises = await storage.getStrengthExercisesByAthleteId(
+          athlete.id,
+          athlete.userId
+        );
+        res.json(exercises);
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  // Get athlete's functional assessments
+  app.get(
+    "/api/athlete/functional-assessments",
+    requireAthleteAuth,
+    async (req, res, next) => {
+      try {
+        const athlete = await storage.getAthlete(req.session.athleteId!);
+        if (!athlete) {
+          return res.status(404).json({ error: "Atleta não encontrado" });
+        }
+
+        const assessments = await storage.getFunctionalAssessmentsByAthleteId(
+          athlete.id,
+          athlete.userId
+        );
+        res.json(assessments);
       } catch (error) {
         next(error);
       }

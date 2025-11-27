@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,33 +10,33 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
-import { Activity } from "lucide-react";
+import { Activity, User } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
 
-export default function Login() {
-  console.log("[LOGIN] Rendering Login page");
-  const [username, setUsername] = useState("");
+export default function AthleteLogin() {
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      await login(username, password);
+      await apiRequest("POST", "/api/athlete/auth/login", { email, password });
       toast({
         title: "Login realizado com sucesso!",
-        description: "Bem-vindo de volta.",
+        description: "Bem-vindo ao seu painel.",
       });
+      setLocation("/atleta");
     } catch (error: any) {
       toast({
         variant: "destructive",
         title: "Erro ao fazer login",
-        description: error.message,
+        description: error.message || "Verifique suas credenciais",
       });
     } finally {
       setIsLoading(false);
@@ -50,47 +50,41 @@ export default function Login() {
           <div className="flex justify-center">
             <Activity className="h-12 w-12 text-primary" />
           </div>
-          <h1 className="text-3xl font-bold">Sistema de Avaliação Física</h1>
-          <p className="text-muted-foreground">Entre para continuar</p>
+          <h1 className="text-3xl font-bold">Área do Atleta</h1>
+          <p className="text-muted-foreground">Acesse seus dados de treino</p>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Login</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <User className="h-5 w-5" />
+              Login do Atleta
+            </CardTitle>
             <CardDescription>
-              Digite suas credenciais para acessar
+              Digite seu email e senha para acessar
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="username">Usuário</Label>
+                <Label htmlFor="email">Email</Label>
                 <Input
-                  id="username"
-                  data-testid="input-username"
-                  type="text"
-                  placeholder="Digite seu usuário"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  id="email"
+                  data-testid="input-athlete-email"
+                  type="email"
+                  placeholder="seu@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   required
-                  autoComplete="username"
+                  autoComplete="email"
                 />
               </div>
 
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Senha</Label>
-                  <Link
-                    href="/forgot-password"
-                    className="text-sm text-primary hover:underline"
-                    data-testid="link-forgot-password"
-                  >
-                    Esqueci minha senha
-                  </Link>
-                </div>
+                <Label htmlFor="password">Senha</Label>
                 <Input
                   id="password"
-                  data-testid="input-password"
+                  data-testid="input-athlete-password"
                   type="password"
                   placeholder="Digite sua senha"
                   value={password}
@@ -104,31 +98,35 @@ export default function Login() {
                 type="submit"
                 className="w-full"
                 disabled={isLoading}
-                data-testid="button-login"
+                data-testid="button-athlete-login"
               >
                 {isLoading ? "Entrando..." : "Entrar"}
               </Button>
             </form>
 
-            <div className="mt-4 text-center text-sm">
-              <span className="text-muted-foreground">Não tem uma conta? </span>
-              <Link
-                href="/register"
-                className="text-primary hover:underline"
-                data-testid="link-register"
-              >
-                Cadastre-se
+            <div className="mt-4 pt-4 border-t">
+              <p className="text-center text-sm text-muted-foreground mb-3">
+                Primeiro acesso ou esqueceu a senha?
+              </p>
+              <Link href="/atleta/solicitar-acesso">
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  data-testid="link-athlete-request-access"
+                >
+                  Solicitar Código de Acesso
+                </Button>
               </Link>
             </div>
 
-            <div className="mt-4 pt-4 border-t text-center text-sm">
-              <span className="text-muted-foreground">É atleta? </span>
+            <div className="mt-4 text-center text-sm">
+              <span className="text-muted-foreground">É treinador? </span>
               <Link
-                href="/atleta/login"
+                href="/login"
                 className="text-primary hover:underline"
-                data-testid="link-athlete-login"
+                data-testid="link-coach-login"
               >
-                Acesse a Área do Atleta
+                Acesse aqui
               </Link>
             </div>
           </CardContent>

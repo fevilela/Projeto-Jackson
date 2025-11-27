@@ -55,6 +55,9 @@ export const athletes = pgTable("athletes", {
   sport: text("sport").notNull(),
   phone: text("phone"),
   email: text("email"),
+  password: text("password"),
+  passwordSetAt: timestamp("password_set_at"),
+  lastLoginAt: timestamp("last_login_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -481,3 +484,48 @@ export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 export const requestPasswordResetSchema = z.object({
   email: z.string().email(),
 });
+
+// Athlete Password Reset Codes
+export const athletePasswordResets = pgTable("athlete_password_resets", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  athleteId: varchar("athlete_id")
+    .notNull()
+    .references(() => athletes.id, { onDelete: "cascade" }),
+  code: text("code").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  usedAt: timestamp("used_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type AthletePasswordReset = typeof athletePasswordResets.$inferSelect;
+
+// Athlete Auth Schemas
+export const athleteLoginSchema = z.object({
+  email: z.string().email("Email inválido"),
+  password: z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
+});
+
+export const athleteRequestResetSchema = z.object({
+  email: z.string().email("Email inválido"),
+});
+
+export const athleteVerifyCodeSchema = z.object({
+  email: z.string().email("Email inválido"),
+  code: z.string().length(6, "Código deve ter 6 dígitos"),
+});
+
+export const athleteSetPasswordSchema = z
+  .object({
+    email: z.string().email("Email inválido"),
+    code: z.string().length(6, "Código deve ter 6 dígitos"),
+    password: z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
+    confirmPassword: z
+      .string()
+      .min(6, "Senha deve ter pelo menos 6 caracteres"),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Senhas não conferem",
+    path: ["confirmPassword"],
+  });
