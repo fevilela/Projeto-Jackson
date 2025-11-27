@@ -195,11 +195,11 @@ function addTextField(
   yPosition += SPACING.medium;
 
   doc.setFont("times", "normal");
-  doc.setFontSize(10);
+  doc.setFontSize(12);
   doc.setTextColor(...COLORS.gray);
   const valueLines = doc.splitTextToSize(value, pageWidth - 2 * margin);
   doc.text(valueLines, margin, yPosition);
-  yPosition += valueLines.length * 5 + SPACING.medium;
+  yPosition += valueLines.length * 6 + SPACING.medium;
 
   return yPosition;
 }
@@ -461,7 +461,7 @@ export async function generateAthleteReport(athleteId: string) {
           halign: "center",
         },
         bodyStyles: {
-          fontSize: 10,
+          fontSize: 12,
           font: "times",
           cellPadding: 4,
         },
@@ -637,7 +637,7 @@ export async function generateAthleteReport(athleteId: string) {
             body: assessmentData,
             theme: "striped",
             bodyStyles: {
-              fontSize: 10,
+              fontSize: 12,
               font: "times",
               cellPadding: 3,
             },
@@ -677,16 +677,40 @@ export async function generateAthleteReport(athleteId: string) {
         pageNumber
       );
 
-      const workoutsData = data.runningWorkouts.map((workout) => [
-        `Semana ${workout.weekNumber}`,
-        workout.dayName,
-        workout.startDate
-          ? format(new Date(workout.startDate), "dd/MM/yyyy")
-          : "-",
-        workout.training,
-        workout.distance || "-",
-        workout.observations || "-",
-      ]);
+      const sortedWorkouts = [...data.runningWorkouts].sort(
+        (a, b) => a.weekNumber - b.weekNumber
+      );
+
+      const weekGroups: { [key: number]: typeof sortedWorkouts } = {};
+      sortedWorkouts.forEach((workout) => {
+        if (!weekGroups[workout.weekNumber]) {
+          weekGroups[workout.weekNumber] = [];
+        }
+        weekGroups[workout.weekNumber].push(workout);
+      });
+
+      const workoutsData: any[][] = [];
+      Object.keys(weekGroups)
+        .map(Number)
+        .sort((a, b) => a - b)
+        .forEach((weekNum) => {
+          const weekWorkouts = weekGroups[weekNum];
+          weekWorkouts.forEach((workout, idx) => {
+            const row = [
+              idx === 0
+                ? { content: `Semana ${weekNum}`, rowSpan: weekWorkouts.length }
+                : null,
+              workout.dayName,
+              workout.startDate
+                ? format(new Date(workout.startDate), "dd/MM/yyyy")
+                : "-",
+              workout.training,
+              workout.distance || "-",
+              workout.observations || "-",
+            ].filter((cell) => cell !== null);
+            workoutsData.push(row);
+          });
+        });
 
       autoTable(doc, {
         startY: yPosition,
@@ -702,12 +726,17 @@ export async function generateAthleteReport(athleteId: string) {
           halign: "center",
         },
         bodyStyles: {
-          fontSize: 9,
+          fontSize: 11,
           font: "times",
           cellPadding: 3,
         },
         columnStyles: {
-          0: { halign: "center", font: "helvetica", fontStyle: "bold" },
+          0: {
+            halign: "center",
+            font: "helvetica",
+            fontStyle: "bold",
+            valign: "middle",
+          },
           1: { halign: "center" },
           2: { halign: "center" },
           3: { cellWidth: 45 },
@@ -763,7 +792,7 @@ export async function generateAthleteReport(athleteId: string) {
             body: planData,
             theme: "striped",
             bodyStyles: {
-              fontSize: 10,
+              fontSize: 12,
               font: "times",
               cellPadding: 3,
             },
@@ -825,7 +854,7 @@ export async function generateAthleteReport(athleteId: string) {
           halign: "center",
         },
         bodyStyles: {
-          fontSize: 10,
+          fontSize: 12,
           font: "times",
           cellPadding: 3,
         },
@@ -877,7 +906,7 @@ export async function generateAthleteReport(athleteId: string) {
           halign: "center",
         },
         bodyStyles: {
-          fontSize: 10,
+          fontSize: 12,
           font: "times",
           cellPadding: 3,
         },
