@@ -1,4 +1,4 @@
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 
 interface EmailOptions {
   to: string;
@@ -6,38 +6,43 @@ interface EmailOptions {
   html: string;
 }
 
-function getResendClient(): Resend | null {
-  if (!process.env.RESEND_API_KEY) {
+function getTransporter() {
+  const user = process.env.GMAIL_USER;
+  const pass = process.env.GMAIL_APP_PASSWORD;
+
+  if (!user || !pass) {
+    console.error("[EMAIL] GMAIL_USER ou GMAIL_APP_PASSWORD não configurados");
     return null;
   }
-  return new Resend(process.env.RESEND_API_KEY);
+
+  return nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user,
+      pass,
+    },
+  });
 }
 
 export async function sendEmail(options: EmailOptions): Promise<boolean> {
   try {
-    const resend = getResendClient();
+    const transporter = getTransporter();
 
-    if (!resend) {
-      console.error("[EMAIL] RESEND_API_KEY não configurada");
+    if (!transporter) {
       return false;
     }
 
-    const { data, error } = await resend.emails.send({
-      from: "Jackson Max Performance <onboarding@resend.dev>",
+    const info = await transporter.sendMail({
+      from: `"Jackson Max Performance" <${process.env.GMAIL_USER}>`,
       to: options.to,
       subject: options.subject,
       html: options.html,
     });
 
-    if (error) {
-      console.error("[EMAIL] Erro Resend:", error);
-      return false;
-    }
-
-    console.log("[EMAIL] Enviado com sucesso:", data?.id);
+    console.log("[EMAIL] Enviado com sucesso:", info.messageId);
     return true;
   } catch (error: any) {
-    console.error("[EMAIL] Erro ao enviar:", error);
+    console.error("[EMAIL] Erro ao enviar:", error.message);
     return false;
   }
 }
