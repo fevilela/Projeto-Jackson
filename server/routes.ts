@@ -1461,6 +1461,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   );
 
+  // Get athlete's own report data (for PDF generation)
+  app.get("/api/athlete/report", requireAthleteAuth, async (req, res, next) => {
+    try {
+      const athlete = await storage.getAthlete(req.session.athleteId!);
+      if (!athlete) {
+        return res.status(404).json({ error: "Atleta não encontrado" });
+      }
+
+      const [
+        tests,
+        anamnesis,
+        runningWorkouts,
+        runningPlans,
+        periodizationPlans,
+        strengthExercises,
+        functionalAssessments,
+        periodizationNote,
+      ] = await Promise.all([
+        storage.getTestsByAthleteId(athlete.id, athlete.userId),
+        storage.getAnamnesisByAthleteId(athlete.id, athlete.userId),
+        storage.getRunningWorkoutsByAthleteId(athlete.id, athlete.userId),
+        storage.getRunningPlansByAthleteId(athlete.id, athlete.userId),
+        storage.getPeriodizationPlansByAthleteId(athlete.id, athlete.userId),
+        storage.getStrengthExercisesByAthleteId(athlete.id, athlete.userId),
+        storage.getFunctionalAssessmentsByAthleteId(athlete.id, athlete.userId),
+        storage.getPeriodizationNoteByAthleteId(athlete.id, athlete.userId),
+      ]);
+
+      res.json({
+        athlete: {
+          id: athlete.id,
+          name: athlete.name,
+          age: athlete.age,
+          sport: athlete.sport,
+          email: athlete.email,
+          phone: athlete.phone,
+        },
+        tests,
+        anamnesis,
+        runningWorkouts,
+        runningPlans,
+        periodizationPlans,
+        strengthExercises,
+        functionalAssessments,
+        periodizationNote,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

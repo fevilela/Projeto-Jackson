@@ -206,7 +206,12 @@ function addTextField(
 
 export async function generateAthleteReport(athleteId: string) {
   try {
-    const response = await fetch(`/api/athletes/${athleteId}/report`);
+    // Determine which endpoint to use
+    const url =
+      athleteId === "self"
+        ? "/api/athlete/report"
+        : `/api/athletes/${athleteId}/report`;
+    const response = await fetch(url, { credentials: "include" });
     if (!response.ok) {
       throw new Error("Erro ao buscar dados do atleta");
     }

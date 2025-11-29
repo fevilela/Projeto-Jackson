@@ -24,7 +24,10 @@ import {
   FileText,
   ClipboardList,
   User,
+  Download,
+  Loader2,
 } from "lucide-react";
+import { generateAthleteReport } from "@/lib/generateAthleteReport";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -52,6 +55,29 @@ export default function AthleteDashboard() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [athlete, setAthlete] = useState<AthleteInfo | null>(null);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+
+  const handleDownloadReport = async () => {
+    if (!athlete) return;
+
+    setIsDownloadingPdf(true);
+    try {
+      await generateAthleteReport("self");
+      toast({
+        title: "PDF gerado!",
+        description: "Seu relatório foi baixado com sucesso.",
+      });
+    } catch (error) {
+      console.error("Erro ao gerar PDF:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Não foi possível gerar o relatório. Tente novamente.",
+      });
+    } finally {
+      setIsDownloadingPdf(false);
+    }
+  };
 
   useEffect(() => {
     checkAuth();
@@ -164,6 +190,20 @@ export default function AthleteDashboard() {
             </div>
             <div className="flex items-center gap-2">
               <Badge variant="secondary">{athlete.sport}</Badge>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleDownloadReport}
+                disabled={isDownloadingPdf}
+                data-testid="button-download-pdf"
+              >
+                {isDownloadingPdf ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4 mr-2" />
+                )}
+                Baixar PDF
+              </Button>
               <ThemeToggle />
               <Button
                 variant="outline"
