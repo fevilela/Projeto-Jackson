@@ -1007,7 +1007,7 @@ export default function Running() {
                       type="number"
                       value={testDistance}
                       onChange={(e) => setTestDistance(e.target.value)}
-                      placeholder="3000"
+                      placeholder="5002"
                       data-testid="input-distance-iat"
                       className="mt-1"
                     />

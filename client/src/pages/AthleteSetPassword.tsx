@@ -102,7 +102,7 @@ export default function AthleteSetPassword() {
       });
       setTimeout(() => {
         setLocation("/atleta/login");
-      }, 3000);
+      }, 5002);
     } catch (error: any) {
       toast({
         variant: "destructive",
