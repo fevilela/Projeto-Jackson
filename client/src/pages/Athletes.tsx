@@ -22,10 +22,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Save, Search, UserPlus } from "lucide-react";
+import type { Plan } from "@shared/schema";
 
 interface Athlete {
   id: string;
@@ -34,6 +42,8 @@ interface Athlete {
   sport: string;
   phone?: string;
   email?: string;
+  planId?: string;
+  dueDay?: number;
 }
 
 export default function Athletes() {
@@ -50,6 +60,8 @@ export default function Athletes() {
     sport: "",
     phone: "",
     email: "",
+    planId: "none",
+    dueDay: "",
   });
   const [newAthleteForm, setNewAthleteForm] = useState({
     name: "",
@@ -57,10 +69,16 @@ export default function Athletes() {
     sport: "",
     phone: "",
     email: "",
+    planId: "none",
+    dueDay: "",
   });
 
   const { data: athletes = [] } = useQuery<Athlete[]>({
     queryKey: ["/api/athletes"],
+  });
+
+  const { data: plans = [] } = useQuery<Plan[]>({
+    queryKey: ["/api/plans"],
   });
 
   const createAthleteMutation = useMutation({
@@ -70,6 +88,8 @@ export default function Athletes() {
       sport: string;
       phone?: string;
       email?: string;
+      planId?: string;
+      dueDay?: string;
     }) => {
       const response = await apiRequest("POST", "/api/athletes", {
         name: data.name,
@@ -77,6 +97,8 @@ export default function Athletes() {
         sport: data.sport,
         phone: data.phone,
         email: data.email,
+        planId: (data.planId && data.planId !== "none") ? data.planId : null,
+        dueDay: data.dueDay ? parseInt(data.dueDay) : null,
       });
       return await response.json();
     },
@@ -106,6 +128,8 @@ export default function Athletes() {
       sport: string;
       phone?: string;
       email?: string;
+      planId?: string;
+      dueDay?: string;
     }) => {
       const response = await apiRequest("PATCH", `/api/athletes/${data.id}`, {
         name: data.name,
@@ -113,6 +137,8 @@ export default function Athletes() {
         sport: data.sport,
         phone: data.phone,
         email: data.email,
+        planId: (data.planId && data.planId !== "none") ? data.planId : null,
+        dueDay: data.dueDay ? parseInt(data.dueDay) : null,
       });
       return await response.json();
     },
@@ -146,7 +172,7 @@ export default function Athletes() {
   const handleCreateNewAthlete = () => {
     if (newAthleteForm.name && newAthleteForm.age && newAthleteForm.sport) {
       createAthleteMutation.mutate(newAthleteForm);
-      setNewAthleteForm({ name: "", age: "", sport: "", phone: "", email: "" });
+      setNewAthleteForm({ name: "", age: "", sport: "", phone: "", email: "", planId: "", dueDay: "" });
       setShowNewAthleteDialog(false);
     }
   };
@@ -165,6 +191,8 @@ export default function Athletes() {
       sport: athlete.sport,
       phone: athlete.phone || "",
       email: athlete.email || "",
+      planId: athlete.planId || "none",
+      dueDay: athlete.dueDay?.toString() || "",
     });
   };
 
@@ -323,10 +351,7 @@ export default function Athletes() {
                   type="tel"
                   value={newAthleteForm.phone}
                   onChange={(e) =>
-                    setNewAthleteForm({
-                      ...newAthleteForm,
-                      phone: e.target.value,
-                    })
+                    setNewAthleteForm({ ...newAthleteForm, phone: e.target.value })
                   }
                   placeholder="(00) 00000-0000"
                   data-testid="input-new-phone"
@@ -339,13 +364,45 @@ export default function Athletes() {
                   type="email"
                   value={newAthleteForm.email}
                   onChange={(e) =>
-                    setNewAthleteForm({
-                      ...newAthleteForm,
-                      email: e.target.value,
-                    })
+                    setNewAthleteForm({ ...newAthleteForm, email: e.target.value })
                   }
                   placeholder="atleta@email.com"
                   data-testid="input-new-email"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="new-plan">Plano</Label>
+                <Select
+                  value={newAthleteForm.planId}
+                  onValueChange={(v) => setNewAthleteForm({ ...newAthleteForm, planId: v })}
+                >
+                  <SelectTrigger id="new-plan">
+                    <SelectValue placeholder="Selecionar plano..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sem plano</SelectItem>
+                    {plans.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-dueday">Dia de Vencimento</Label>
+                <Input
+                  id="new-dueday"
+                  type="number"
+                  min="1"
+                  max="31"
+                  value={newAthleteForm.dueDay}
+                  onChange={(e) =>
+                    setNewAthleteForm({ ...newAthleteForm, dueDay: e.target.value })
+                  }
+                  placeholder="Ex: 10"
                 />
               </div>
             </div>
@@ -354,13 +411,7 @@ export default function Athletes() {
                 variant="outline"
                 onClick={() => {
                   setShowNewAthleteDialog(false);
-                  setNewAthleteForm({
-                    name: "",
-                    age: "",
-                    sport: "",
-                    phone: "",
-                    email: "",
-                  });
+                  setNewAthleteForm({ name: "", age: "", sport: "", phone: "", email: "", planId: "", dueDay: "" });
                 }}
                 data-testid="button-cancel-new"
               >
@@ -462,6 +513,41 @@ export default function Athletes() {
                   }
                   placeholder="atleta@email.com"
                   data-testid="input-edit-email"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-plan">Plano</Label>
+                <Select
+                  value={editForm.planId}
+                  onValueChange={(v) => setEditForm({ ...editForm, planId: v })}
+                >
+                  <SelectTrigger id="edit-plan">
+                    <SelectValue placeholder="Selecionar plano..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sem plano</SelectItem>
+                    {plans.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-dueday">Dia de Vencimento</Label>
+                <Input
+                  id="edit-dueday"
+                  type="number"
+                  min="1"
+                  max="31"
+                  value={editForm.dueDay}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, dueDay: e.target.value })
+                  }
+                  placeholder="Ex: 10"
                 />
               </div>
             </div>

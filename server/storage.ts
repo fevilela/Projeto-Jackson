@@ -18,6 +18,9 @@ import {
   financialTransactions,
   passwordResetTokens,
   athletePasswordResets,
+  plans,
+  planCharges,
+  whatsappMessages,
   type User,
   type InsertUser,
   type UpdateProfile,
@@ -50,6 +53,12 @@ import {
   type FinancialTransaction,
   type InsertFinancialTransaction,
   type PasswordResetToken,
+  type Plan,
+  type InsertPlan,
+  type PlanCharge,
+  type InsertPlanCharge,
+  type WhatsappMessage,
+  type InsertWhatsappMessage,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -215,6 +224,41 @@ export interface IStorage {
     transaction: Partial<InsertFinancialTransaction>
   ): Promise<FinancialTransaction>;
   deleteFinancialTransaction(id: string, userId: string): Promise<void>;
+
+  // Plan methods
+  getPlansByUserId(userId: string): Promise<Plan[]>;
+  getPlan(id: string, userId: string): Promise<Plan | undefined>;
+  createPlan(plan: InsertPlan): Promise<Plan>;
+  updatePlan(id: string, userId: string, plan: Partial<InsertPlan>): Promise<Plan>;
+  deletePlan(id: string, userId: string): Promise<void>;
+
+  // Athletes with plan info (para tela de Mensalidades)
+  getAthletesWithPlanByUserId(
+    userId: string
+  ): Promise<(Athlete & { planName?: string | null; planType?: string | null; planPrice?: string | null })[]>;
+
+  // PlanCharge methods
+  getPlanChargesByAthleteId(athleteId: string, userId: string): Promise<PlanCharge[]>;
+  getPlanChargesByUserId(userId: string): Promise<PlanCharge[]>;
+  createPlanCharge(charge: InsertPlanCharge): Promise<PlanCharge>;
+  updatePlanCharge(id: string, userId: string, data: Partial<InsertPlanCharge>): Promise<PlanCharge>;
+  deletePlanCharge(id: string, userId: string): Promise<void>;
+  getPlanChargesForNotification(todayStr: string, preDueDateStr: string): Promise<{
+    id: string; chargeDate: string; amount: string; description: string;
+    notifiedPreDue: string; notifiedOnDue: string; isPaid: string;
+    athleteId: string; userId: string;
+    athleteName: string; athletePhone: string | null; planName: string | null;
+  }[]>;
+  markChargeNotifiedPreDue(id: string): Promise<void>;
+  markChargeNotifiedOnDue(id: string): Promise<void>;
+
+  // WhatsApp Messages methods
+  createWhatsappMessage(data: InsertWhatsappMessage): Promise<WhatsappMessage>;
+  getWhatsappConversationsByUserId(userId: string): Promise<{
+    athleteId: string; athleteName: string; athletePhone: string | null;
+    lastMessage: string | null; lastSentAt: string | null;
+  }[]>;
+  getWhatsappMessagesByAthleteId(athleteId: string, userId: string): Promise<WhatsappMessage[]>;
 
   // Athlete Auth methods
   getAthleteByEmail(email: string): Promise<Athlete | undefined>;
@@ -1065,6 +1109,188 @@ export class DatabaseStorage implements IStorage {
     await db
       .delete(athletePasswordResets)
       .where(sql`${athletePasswordResets.expiresAt} < NOW()`);
+  }
+
+  // Plan methods
+  async getPlansByUserId(userId: string): Promise<Plan[]> {
+    return await db
+      .select()
+      .from(plans)
+      .where(eq(plans.userId, userId))
+      .orderBy(desc(plans.createdAt));
+  }
+
+  async getPlan(id: string, userId: string): Promise<Plan | undefined> {
+    const result = await db
+      .select()
+      .from(plans)
+      .where(and(eq(plans.id, id), eq(plans.userId, userId)))
+      .limit(1);
+    return result[0];
+  }
+
+  async createPlan(plan: InsertPlan): Promise<Plan> {
+    const result = await db.insert(plans).values(plan).returning();
+    return result[0];
+  }
+
+  async updatePlan(id: string, userId: string, updateData: Partial<InsertPlan>): Promise<Plan> {
+    const result = await db
+      .update(plans)
+      .set(updateData)
+      .where(and(eq(plans.id, id), eq(plans.userId, userId)))
+      .returning();
+    if (!result[0]) throw new Error("Plano não encontrado ou não autorizado");
+    return result[0];
+  }
+
+  async deletePlan(id: string, userId: string): Promise<void> {
+    await db.delete(plans).where(and(eq(plans.id, id), eq(plans.userId, userId)));
+  }
+
+  // Athletes with plan info
+  async getAthletesWithPlanByUserId(userId: string): Promise<(Athlete & { planName?: string | null; planType?: string | null; planPrice?: string | null })[]> {
+    const result = await db
+      .select({
+        id: athletes.id,
+        userId: athletes.userId,
+        name: athletes.name,
+        age: athletes.age,
+        sport: athletes.sport,
+        phone: athletes.phone,
+        email: athletes.email,
+        password: athletes.password,
+        passwordSetAt: athletes.passwordSetAt,
+        lastLoginAt: athletes.lastLoginAt,
+        planId: athletes.planId,
+        dueDay: athletes.dueDay,
+        createdAt: athletes.createdAt,
+        planName: plans.name,
+        planType: plans.type,
+        planPrice: plans.price,
+      })
+      .from(athletes)
+      .leftJoin(plans, eq(athletes.planId, plans.id))
+      .where(eq(athletes.userId, userId))
+      .orderBy(athletes.name);
+    return result;
+  }
+
+  // PlanCharge methods
+  async getPlanChargesByAthleteId(athleteId: string, userId: string): Promise<PlanCharge[]> {
+    return await db
+      .select()
+      .from(planCharges)
+      .where(and(eq(planCharges.athleteId, athleteId), eq(planCharges.userId, userId)))
+      .orderBy(desc(planCharges.chargeDate));
+  }
+
+  async getPlanChargesByUserId(userId: string): Promise<PlanCharge[]> {
+    return await db
+      .select()
+      .from(planCharges)
+      .where(eq(planCharges.userId, userId))
+      .orderBy(desc(planCharges.chargeDate));
+  }
+
+  async createPlanCharge(charge: InsertPlanCharge): Promise<PlanCharge> {
+    const result = await db.insert(planCharges).values(charge).returning();
+    return result[0];
+  }
+
+  async updatePlanCharge(id: string, userId: string, updateData: Partial<InsertPlanCharge>): Promise<PlanCharge> {
+    const result = await db
+      .update(planCharges)
+      .set(updateData)
+      .where(and(eq(planCharges.id, id), eq(planCharges.userId, userId)))
+      .returning();
+    if (!result[0]) throw new Error("Cobrança não encontrada ou não autorizada");
+    return result[0];
+  }
+
+  async deletePlanCharge(id: string, userId: string): Promise<void> {
+    await db.delete(planCharges).where(and(eq(planCharges.id, id), eq(planCharges.userId, userId)));
+  }
+
+  async getPlanChargesForNotification(todayStr: string, preDueDateStr: string) {
+    const result = await db
+      .select({
+        id: planCharges.id,
+        chargeDate: planCharges.chargeDate,
+        amount: planCharges.amount,
+        description: planCharges.description,
+        notifiedPreDue: planCharges.notifiedPreDue,
+        notifiedOnDue: planCharges.notifiedOnDue,
+        isPaid: planCharges.isPaid,
+        athleteId: planCharges.athleteId,
+        userId: planCharges.userId,
+        athleteName: athletes.name,
+        athletePhone: athletes.phone,
+        planName: plans.name,
+      })
+      .from(planCharges)
+      .innerJoin(athletes, eq(planCharges.athleteId, athletes.id))
+      .leftJoin(plans, eq(planCharges.planId, plans.id))
+      .where(
+        and(
+          sql`${planCharges.isPaid} = 'nao'`,
+          sql`${planCharges.chargeDate} IN (${todayStr}, ${preDueDateStr})`
+        )
+      );
+    return result;
+  }
+
+  async markChargeNotifiedPreDue(id: string): Promise<void> {
+    await db.update(planCharges).set({ notifiedPreDue: "sim" }).where(eq(planCharges.id, id));
+  }
+
+  async markChargeNotifiedOnDue(id: string): Promise<void> {
+    await db.update(planCharges).set({ notifiedOnDue: "sim" }).where(eq(planCharges.id, id));
+  }
+
+  async createWhatsappMessage(data: InsertWhatsappMessage): Promise<WhatsappMessage> {
+    const result = await db.insert(whatsappMessages).values(data).returning();
+    return result[0];
+  }
+
+  async getWhatsappConversationsByUserId(userId: string) {
+    const result = await db
+      .select({
+        athleteId: athletes.id,
+        athleteName: athletes.name,
+        athletePhone: athletes.phone,
+        lastMessage: sql<string>`(
+          SELECT message FROM whatsapp_messages wm
+          WHERE wm.athlete_id = ${athletes.id}
+          ORDER BY wm.sent_at DESC LIMIT 1
+        )`,
+        lastSentAt: sql<string>`(
+          SELECT sent_at FROM whatsapp_messages wm
+          WHERE wm.athlete_id = ${athletes.id}
+          ORDER BY wm.sent_at DESC LIMIT 1
+        )`,
+      })
+      .from(athletes)
+      .where(
+        and(
+          eq(athletes.userId, userId),
+          sql`EXISTS (SELECT 1 FROM whatsapp_messages wm WHERE wm.athlete_id = ${athletes.id})`
+        )
+      )
+      .orderBy(sql`(
+        SELECT sent_at FROM whatsapp_messages wm
+        WHERE wm.athlete_id = ${athletes.id}
+        ORDER BY wm.sent_at DESC LIMIT 1
+      ) DESC`);
+    return result;
+  }
+
+  async getWhatsappMessagesByAthleteId(athleteId: string, userId: string): Promise<WhatsappMessage[]> {
+    return db
+      .select()
+      .from(whatsappMessages)
+      .where(and(eq(whatsappMessages.athleteId, athleteId), eq(whatsappMessages.userId, userId)))
+      .orderBy(whatsappMessages.sentAt);
   }
 }
 

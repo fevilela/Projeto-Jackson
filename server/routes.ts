@@ -25,6 +25,8 @@ import {
   insertAnamnesisSchema,
   updateAnamnesisSchema,
   insertFinancialTransactionSchema,
+  insertPlanSchema,
+  insertPlanChargeSchema,
   requestPasswordResetSchema,
   athleteLoginSchema,
   athleteRequestResetSchema,
@@ -37,6 +39,8 @@ import {
   generatePasswordResetEmail,
   sendAthleteAccessCode,
 } from "./email";
+import { whatsAppService } from "./whatsapp";
+import { sendDueNotifications } from "./cron";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth routes
@@ -1111,6 +1115,199 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
   );
+
+  // ========== PLANS ROUTES ==========
+
+  app.get("/api/plans", requireAuth, async (req, res, next) => {
+    try {
+      const result = await storage.getPlansByUserId(req.session.userId!);
+      res.json(result);
+    } catch (error) { next(error); }
+  });
+
+  app.post("/api/plans", requireAuth, async (req, res, next) => {
+    try {
+      const { userId: _u, ...body } = req.body;
+      const data = insertPlanSchema.parse({ ...body, userId: req.session.userId! });
+      const plan = await storage.createPlan(data);
+      res.json(plan);
+    } catch (error) { next(error); }
+  });
+
+  app.patch("/api/plans/:id", requireAuth, async (req, res, next) => {
+    try {
+      const { userId: _u, ...body } = req.body;
+      const data = insertPlanSchema.partial().parse(body);
+      const plan = await storage.updatePlan(req.params.id, req.session.userId!, data);
+      res.json(plan);
+    } catch (error) { next(error); }
+  });
+
+  app.delete("/api/plans/:id", requireAuth, async (req, res, next) => {
+    try {
+      await storage.deletePlan(req.params.id, req.session.userId!);
+      res.json({ message: "Plano excluído com sucesso" });
+    } catch (error) { next(error); }
+  });
+
+  // ========== ATHLETES WITH PLAN (Mensalidades) ==========
+
+  app.get("/api/athletes-with-plan", requireAuth, async (req, res, next) => {
+    try {
+      const result = await storage.getAthletesWithPlanByUserId(req.session.userId!);
+      res.json(result);
+    } catch (error) { next(error); }
+  });
+
+  // ========== PLAN CHARGES ROUTES ==========
+
+  app.get("/api/plan-charges", requireAuth, async (req, res, next) => {
+    try {
+      const result = await storage.getPlanChargesByUserId(req.session.userId!);
+      res.json(result);
+    } catch (error) { next(error); }
+  });
+
+  app.get("/api/plan-charges/by-athlete/:athleteId", requireAuth, async (req, res, next) => {
+    try {
+      const result = await storage.getPlanChargesByAthleteId(req.params.athleteId, req.session.userId!);
+      res.json(result);
+    } catch (error) { next(error); }
+  });
+
+  app.post("/api/plan-charges", requireAuth, async (req, res, next) => {
+    try {
+      const { userId: _u, ...body } = req.body;
+      const data = insertPlanChargeSchema.parse({ ...body, userId: req.session.userId! });
+      const athlete = await storage.getAthlete(data.athleteId);
+      if (!athlete || athlete.userId !== req.session.userId) {
+        return res.status(403).json({ error: "Atleta não autorizado" });
+      }
+      const result = await storage.createPlanCharge(data);
+      res.json(result);
+    } catch (error) { next(error); }
+  });
+
+  app.patch("/api/plan-charges/:id", requireAuth, async (req, res, next) => {
+    try {
+      const { userId: _u, ...body } = req.body;
+      const data = insertPlanChargeSchema.partial().parse(body);
+      const result = await storage.updatePlanCharge(req.params.id, req.session.userId!, data);
+      res.json(result);
+    } catch (error) { next(error); }
+  });
+
+  app.delete("/api/plan-charges/:id", requireAuth, async (req, res, next) => {
+    try {
+      await storage.deletePlanCharge(req.params.id, req.session.userId!);
+      res.json({ message: "Cobrança excluída com sucesso" });
+    } catch (error) { next(error); }
+  });
+
+  // ========== WHATSAPP ROUTES ==========
+
+  app.get("/api/whatsapp/status", requireAuth, (_req, res) => {
+    res.json(whatsAppService.getStatus());
+  });
+
+  app.post("/api/whatsapp/connect", requireAuth, async (_req, res, next) => {
+    try {
+      await whatsAppService.connect();
+      res.json({ message: "Conectando..." });
+    } catch (error) { next(error); }
+  });
+
+  app.post("/api/whatsapp/disconnect", requireAuth, async (_req, res, next) => {
+    try {
+      await whatsAppService.disconnect();
+      res.json({ message: "Desconectado com sucesso" });
+    } catch (error) { next(error); }
+  });
+
+  app.post("/api/whatsapp/test-notification", requireAuth, async (_req, res, next) => {
+    try {
+      if (!whatsAppService.isConnected()) {
+        return res.status(400).json({ error: "WhatsApp não conectado" });
+      }
+      await sendDueNotifications();
+      res.json({ message: "Verificação de notificações executada com sucesso" });
+    } catch (error) { next(error); }
+  });
+
+  app.get("/api/whatsapp/profile-picture/:athleteId", requireAuth, async (req, res, next) => {
+    try {
+      const userId = req.session.userId!;
+      const athlete = await storage.getAthlete(req.params.athleteId);
+      if (!athlete || athlete.userId !== userId || !athlete.phone) {
+        return res.json({ url: null });
+      }
+      const url = await whatsAppService.getProfilePicture(athlete.phone);
+      res.json({ url });
+    } catch (error) { next(error); }
+  });
+
+  app.get("/api/whatsapp/conversations", requireAuth, async (req, res, next) => {
+    try {
+      const userId = req.session.userId!;
+      const conversations = await storage.getWhatsappConversationsByUserId(userId);
+      res.json(conversations);
+    } catch (error) { next(error); }
+  });
+
+  app.get("/api/whatsapp/conversations/:athleteId", requireAuth, async (req, res, next) => {
+    try {
+      const userId = req.session.userId!;
+      const messages = await storage.getWhatsappMessagesByAthleteId(req.params.athleteId, userId);
+      res.json(messages);
+    } catch (error) { next(error); }
+  });
+
+  app.post("/api/whatsapp/send-to-athlete", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const { athleteId, message } = req.body;
+      if (!athleteId || !message) {
+        return res.status(400).json({ error: "Atleta e mensagem obrigatórios" });
+      }
+      if (!whatsAppService.isConnected()) {
+        return res.status(400).json({ error: "WhatsApp não está conectado" });
+      }
+      const athlete = await storage.getAthlete(athleteId);
+      if (!athlete || athlete.userId !== userId) {
+        return res.status(404).json({ error: "Atleta não encontrado" });
+      }
+      if (!athlete.phone) {
+        return res.status(400).json({ error: "Atleta não possui telefone cadastrado" });
+      }
+      await whatsAppService.sendMessage(athlete.phone, message);
+      const saved = await storage.createWhatsappMessage({
+        userId,
+        athleteId,
+        phone: athlete.phone,
+        message,
+        type: "manual",
+      });
+      res.json(saved);
+    } catch (error: any) {
+      res.status(500).json({ error: error?.message || "Erro ao enviar mensagem" });
+    }
+  });
+
+  app.post("/api/whatsapp/send-test", requireAuth, async (req, res) => {
+    try {
+      const { phone, message } = req.body;
+      if (!phone || !message) {
+        return res.status(400).json({ error: "Telefone e mensagem obrigatórios" });
+      }
+      if (!whatsAppService.isConnected()) {
+        return res.status(400).json({ error: "WhatsApp não está conectado" });
+      }
+      await whatsAppService.sendMessage(phone, message);
+      res.json({ message: "Mensagem enviada com sucesso!" });
+    } catch (error: any) {
+      res.status(500).json({ error: error?.message || "Erro ao enviar mensagem" });
+    }
+  });
 
   // ========== ATHLETE AUTH ROUTES ==========
 

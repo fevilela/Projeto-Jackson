@@ -37,6 +37,9 @@ import {
   Home,
   DollarSign,
   UserCircle,
+  CreditCard,
+  Receipt,
+  MessageCircle,
 } from "lucide-react";
 import type { FinancialTransaction } from "@shared/schema";
 
@@ -45,6 +48,11 @@ const cadastroItems = [
     title: "Atletas",
     url: "/athletes",
     icon: UserPlus,
+  },
+  {
+    title: "Planos",
+    url: "/plans",
+    icon: CreditCard,
   },
   {
     title: "Tipos de Movimento",
@@ -89,16 +97,30 @@ const otherMenuItems = [
     url: "/assessment",
     icon: Stethoscope,
   },
+];
+
+const financeiroItems = [
   {
-    title: "Financeiro",
+    title: "Lançamentos",
     url: "/financial",
-    icon: DollarSign,
+    icon: Receipt,
+  },
+  {
+    title: "Mensalidades",
+    url: "/mensalidades",
+    icon: CreditCard,
   },
 ];
 
 export function AppSidebar() {
   const [location] = useLocation();
   const [isCadastroOpen, setIsCadastroOpen] = useState(true);
+  const [isFinanceiroOpen, setIsFinanceiroOpen] = useState(
+    location === "/financial" || location === "/mensalidades"
+  );
+  const [isWhatsappOpen, setIsWhatsappOpen] = useState(
+    location === "/whatsapp" || location === "/whatsapp/conversas"
+  );
 
   const { data: transactions = [] } = useQuery<
     (FinancialTransaction & { athleteName?: string | null })[]
@@ -194,20 +216,100 @@ export function AppSidebar() {
                     <Link href={item.url}>
                       <item.icon />
                       <span>{item.title}</span>
-                      {item.url === "/financial" &&
-                        pendingRemindersCount > 0 && (
-                          <Badge
-                            variant="destructive"
-                            className="ml-auto animate-pulse"
-                            data-testid="badge-financial-notifications"
-                          >
-                            {pendingRemindersCount}
-                          </Badge>
-                        )}
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+
+              <Collapsible
+                open={isFinanceiroOpen}
+                onOpenChange={setIsFinanceiroOpen}
+                className="group/collapsible-fin"
+              >
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton
+                      isActive={location === "/financial" || location === "/mensalidades"}
+                      data-testid="sidebar-item-financeiro"
+                    >
+                      <DollarSign />
+                      <span>Financeiro</span>
+                      {pendingRemindersCount > 0 && (
+                        <Badge
+                          variant="destructive"
+                          className="ml-auto animate-pulse"
+                          data-testid="badge-financial-notifications"
+                        >
+                          {pendingRemindersCount}
+                        </Badge>
+                      )}
+                      <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible-fin:rotate-180" />
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      {financeiroItems.map((item) => (
+                        <SidebarMenuSubItem key={item.title}>
+                          <SidebarMenuSubButton
+                            asChild
+                            isActive={location === item.url}
+                            data-testid={`sidebar-subitem-${item.title.toLowerCase()}`}
+                          >
+                            <Link href={item.url}>
+                              <item.icon />
+                              <span>{item.title}</span>
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ))}
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Configurações</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <Collapsible
+                open={isWhatsappOpen}
+                onOpenChange={setIsWhatsappOpen}
+                className="group/collapsible-wa"
+              >
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton
+                      isActive={location === "/whatsapp" || location === "/whatsapp/conversas"}
+                      data-testid="sidebar-item-whatsapp"
+                    >
+                      <MessageCircle />
+                      <span>WhatsApp</span>
+                      <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible-wa:rotate-180" />
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      <SidebarMenuSubItem>
+                        <SidebarMenuSubButton asChild isActive={location === "/whatsapp"}>
+                          <Link href="/whatsapp">
+                            <span>Conexão</span>
+                          </Link>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+                      <SidebarMenuSubItem>
+                        <SidebarMenuSubButton asChild isActive={location === "/whatsapp/conversas"}>
+                          <Link href="/whatsapp/conversas">
+                            <span>Conversas</span>
+                          </Link>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

@@ -20,6 +20,10 @@ import Strength from "@/pages/Strength";
 import Assessment from "@/pages/Assessment";
 import Anamnese from "@/pages/Anamnese";
 import Financial from "@/pages/Financial";
+import Plans from "@/pages/Plans";
+import Mensalidades from "@/pages/Mensalidades";
+import WhatsappSettings from "@/pages/WhatsappSettings";
+import WhatsappConversations from "@/pages/WhatsappConversations";
 import Profile from "@/pages/Profile";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
@@ -62,6 +66,10 @@ function MainLayout() {
               <Route path="/assessment" component={Assessment} />
               <Route path="/anamnese" component={Anamnese} />
               <Route path="/financial" component={Financial} />
+              <Route path="/plans" component={Plans} />
+              <Route path="/mensalidades" component={Mensalidades} />
+              <Route path="/whatsapp" component={WhatsappSettings} />
+              <Route path="/whatsapp/conversas" component={WhatsappConversations} />
               <Route path="/profile" component={Profile} />
               <Route component={NotFound} />
             </Switch>
@@ -129,6 +137,26 @@ function Router() {
         </ProtectedRoute>
       </Route>
       <Route path="/financial">
+        <ProtectedRoute>
+          <MainLayout />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/plans">
+        <ProtectedRoute>
+          <MainLayout />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/mensalidades">
+        <ProtectedRoute>
+          <MainLayout />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/whatsapp">
+        <ProtectedRoute>
+          <MainLayout />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/whatsapp/conversas">
         <ProtectedRoute>
           <MainLayout />
         </ProtectedRoute>

@@ -58,6 +58,10 @@ export const athletes = pgTable("athletes", {
   password: text("password"),
   passwordSetAt: timestamp("password_set_at"),
   lastLoginAt: timestamp("last_login_at"),
+  planId: varchar("plan_id").references((): any => plans.id, {
+    onDelete: "set null",
+  }),
+  dueDay: integer("due_day"), // dia do mês de vencimento (1-31)
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -464,6 +468,92 @@ export type InsertFinancialTransaction = z.infer<
   typeof insertFinancialTransactionSchema
 >;
 export type FinancialTransaction = typeof financialTransactions.$inferSelect;
+
+// Plans (Planos de treino/assinatura)
+export const plans = pgTable("plans", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  type: text("type").notNull(), // "por_aula" | "mensal"
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertPlanSchema = createInsertSchema(plans).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertPlan = z.infer<typeof insertPlanSchema>;
+export type Plan = typeof plans.$inferSelect;
+
+// Plan Charges (Cobranças — sessões para por_aula, mensalidades para mensal)
+export const planCharges = pgTable("plan_charges", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  athleteId: varchar("athlete_id")
+    .notNull()
+    .references(() => athletes.id, { onDelete: "cascade" }),
+  planId: varchar("plan_id").references(() => plans.id, {
+    onDelete: "set null",
+  }),
+  chargeDate: text("charge_date").notNull(), // data de vencimento da cobrança
+  description: text("description").notNull(),
+  attendanceCount: integer("attendance_count").notNull().default(1),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  isPaid: text("is_paid").notNull().default("nao"), // "nao" | "sim"
+  paidAt: text("paid_at"),
+  notes: text("notes"),
+  notifiedPreDue: text("notified_pre_due").notNull().default("nao"), // aviso 4 dias antes
+  notifiedOnDue: text("notified_on_due").notNull().default("nao"),   // aviso no dia
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertPlanChargeSchema = createInsertSchema(planCharges).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertPlanCharge = z.infer<typeof insertPlanChargeSchema>;
+export type PlanCharge = typeof planCharges.$inferSelect;
+
+// WhatsApp Messages (histórico de mensagens enviadas)
+export const whatsappMessages = pgTable("whatsapp_messages", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  athleteId: varchar("athlete_id")
+    .notNull()
+    .references(() => athletes.id, { onDelete: "cascade" }),
+  phone: text("phone").notNull(),
+  message: text("message").notNull(),
+  type: text("type").notNull().default("manual"), // "manual" | "pre_due" | "on_due"
+  sentAt: timestamp("sent_at").defaultNow().notNull(),
+});
+
+export const insertWhatsappMessageSchema = createInsertSchema(
+  whatsappMessages
+).omit({
+  id: true,
+  sentAt: true,
+});
+
+export type InsertWhatsappMessage = z.infer<
+  typeof insertWhatsappMessageSchema
+>;
+export type WhatsappMessage = typeof whatsappMessages.$inferSelect;
 
 // Password Reset Tokens
 export const passwordResetTokens = pgTable("password_reset_tokens", {

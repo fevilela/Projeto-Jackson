@@ -4,6 +4,7 @@ import session from "express-session";
 import MemoryStore from "memorystore";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { startNotificationCron } from "./cron";
 
 const app = express();
 
@@ -156,4 +157,5 @@ app.use((req, res, next) => {
   };
 
   tryListen();
+  startNotificationCron();
 })();
