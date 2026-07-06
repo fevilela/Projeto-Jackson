@@ -68,7 +68,13 @@ class WhatsAppService {
           this.qrCode = null;
           this.socket = null;
 
-          if (!loggedOut) {
+          if (loggedOut) {
+            // Sessão inválida/expirada: apaga os creds para forçar
+            // a geração de um QR code novo na próxima tentativa.
+            if (fs.existsSync(this.sessionPath)) {
+              fs.rmSync(this.sessionPath, { recursive: true, force: true });
+            }
+          } else {
             log("[WhatsApp] Reconectando em 5s...");
             setTimeout(() => this.connect().catch(() => {}), 5000);
           }
