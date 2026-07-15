@@ -43,6 +43,13 @@ import { whatsAppService } from "./whatsapp";
 import { sendDueNotifications } from "./cron";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Health check público (sem auth) — usado por um serviço externo de ping
+  // para manter o processo acordado no plano Render Free e evitar que a
+  // conexão do WhatsApp caia por causa do dyno dormindo.
+  app.get("/api/health", (_req, res) => {
+    res.json({ status: "ok", whatsapp: whatsAppService.getStatus().status });
+  });
+
   // Auth routes
   app.post("/api/auth/register", async (req, res, next) => {
     try {

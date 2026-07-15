@@ -555,6 +555,16 @@ export type InsertWhatsappMessage = z.infer<
 >;
 export type WhatsappMessage = typeof whatsappMessages.$inferSelect;
 
+// WhatsApp Session Files (credenciais do Baileys, persistidas no banco para
+// sobreviver a reinícios/deploys em hospedagens com disco não-persistente)
+export const whatsappSessionFiles = pgTable("whatsapp_session_files", {
+  name: text("name").primaryKey(),
+  content: text("content").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type WhatsappSessionFile = typeof whatsappSessionFiles.$inferSelect;
+
 // Password Reset Tokens
 export const passwordResetTokens = pgTable("password_reset_tokens", {
   id: varchar("id")

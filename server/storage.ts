@@ -21,6 +21,7 @@ import {
   plans,
   planCharges,
   whatsappMessages,
+  whatsappSessionFiles,
   type User,
   type InsertUser,
   type UpdateProfile,
@@ -259,6 +260,12 @@ export interface IStorage {
     lastMessage: string | null; lastSentAt: string | null;
   }[]>;
   getWhatsappMessagesByAthleteId(athleteId: string, userId: string): Promise<WhatsappMessage[]>;
+
+  // WhatsApp Session Files methods (persistência da sessão do Baileys)
+  getWhatsappSessionFiles(): Promise<{ name: string; content: string }[]>;
+  upsertWhatsappSessionFile(name: string, content: string): Promise<void>;
+  deleteWhatsappSessionFile(name: string): Promise<void>;
+  clearWhatsappSessionFiles(): Promise<void>;
 
   // Athlete Auth methods
   getAthleteByEmail(email: string): Promise<Athlete | undefined>;
@@ -1291,6 +1298,30 @@ export class DatabaseStorage implements IStorage {
       .from(whatsappMessages)
       .where(and(eq(whatsappMessages.athleteId, athleteId), eq(whatsappMessages.userId, userId)))
       .orderBy(whatsappMessages.sentAt);
+  }
+
+  async getWhatsappSessionFiles(): Promise<{ name: string; content: string }[]> {
+    return db
+      .select({ name: whatsappSessionFiles.name, content: whatsappSessionFiles.content })
+      .from(whatsappSessionFiles);
+  }
+
+  async upsertWhatsappSessionFile(name: string, content: string): Promise<void> {
+    await db
+      .insert(whatsappSessionFiles)
+      .values({ name, content })
+      .onConflictDoUpdate({
+        target: whatsappSessionFiles.name,
+        set: { content, updatedAt: new Date() },
+      });
+  }
+
+  async deleteWhatsappSessionFile(name: string): Promise<void> {
+    await db.delete(whatsappSessionFiles).where(eq(whatsappSessionFiles.name, name));
+  }
+
+  async clearWhatsappSessionFiles(): Promise<void> {
+    await db.delete(whatsappSessionFiles);
   }
 }
 
